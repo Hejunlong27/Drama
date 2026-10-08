@@ -1,0 +1,5 @@
+{
+  "_comment": "角色参考图字典。值支持三种形态：① http(s) URL 直接透传 ② data:image/...;base64,... 内联 ③ 本地路径（相对 data/ 目录，会自动上传换 URL）。下面的 data: 是 1x1 占位图，请替换成你的真实角色图。",
+  "char_01": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "char_02": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+}

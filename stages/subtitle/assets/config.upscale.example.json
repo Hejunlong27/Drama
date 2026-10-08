@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "_note": "高清放大配置 —— 改这里就能改目标分辨率/模型/编码，不需要动代码。用法：python scripts/upscale.py --ep ep03",
+
+  "enabled": true,
+
+  "tool": {
+    "_note": "留空 = 自动探测。本机实测：Topaz 装在 D 盘，模型权重也被挪到了 D 盘；独立跑 ffmpeg 必须把这两个目录用环境变量告诉它，否则报 'Model not found: prob-4'。",
+    "install_dir": "",
+    "ffmpeg": "",
+    "ffprobe": "",
+    "model_dir": "C:\\ProgramData\\Topaz Labs LLC\\Topaz Video\\models",
+    "model_data_dir": "D:\\ProgramData\\Topaz Labs LLC\\Topaz Video\\models",
+    "extra_env": {}
+  },
+
+  "target": {
+    "_note": "mode=width：按宽度等比放大（1440x832 -> 2560x1480，宽高比不变、只差 0.06%）。想严格 16:9 用 mode=exact + 2560x1440（会裁掉 22px 高度）；想刚好 2 倍用 mode=factor + scale=2。",
+    "mode": "width",
+    "width": 2560,
+    "scale": 2.0,
+    "keep_aspect": true,
+    "even": true
+  },
+
+  "model": {
+    "name": "prob-4",
+    "_note": "prob-4 = Proteus 4：通用向，实拍/AI 生成人物最稳，本机 GUI 实测用的就是它。备选：iris-3 人脸修复、nyx-3 降噪、rhea-1 4 倍。estimate=8 让模型自己估参数（= GUI 的 Auto）。",
+    "scale": 0,
+    "estimate": 8,
+    "blend": 0.2,
+    "preblur": 0.0,
+    "noise": 0.0,
+    "details": 0.0,
+    "halo": 0.0,
+    "blur": 0.0,
+    "compression": 0.0,
+    "device": 0,
+    "vram": 1,
+    "instances": 1
+  },
+
+  "encode": {
+    "_note": "h264_nvenc + constqp 18 与 Topaz GUI 完整导出的参数一致（本机实测 13.7s 段 -> 16.8MB / 10.4Mbps）。要更小体积可把 codec 换 hevc_nvenc。",
+    "codec": "h264_nvenc",
+    "preset": "p5",
+    "rc": "constqp",
+    "qp": 18,
+    "profile": "high",
+    "pix_fmt": "yuv420p",
+    "audio": "copy"
+  },
+
+  "verify": {
+    "_note": "抽样帧与『纯 lanczos 插值』对比：AI 超分必须比插值更锐，否则说明模型根本没生效。",
+    "samples": 3,
+    "min_frame_gain_hf": 1.02,
+    "min_frame_gain_lap": 1.05
+  }
+}

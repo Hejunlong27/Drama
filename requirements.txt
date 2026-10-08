@@ -1,0 +1,13 @@
+# drama-agent 固化依赖清单（与本仓库副本同版本验证）
+# 运行环境：Windows + Python 3.10+（实测 3.13）
+# 安装：pip install -r requirements.txt
+httpx==0.28.1
+Pillow==12.2.0
+
+# 说明：
+# - stages/video/workflow/scripts/engine/requirements.txt 为引擎自带宽约束（httpx>=0.27, Pillow>=10），
+#   本文件是对当前验证版本的精确锁定，优先使用本文件。
+# - 字幕对齐依赖 ctc-forced-aligner（独立 venv，从 GitHub 源码安装，勿从 PyPI 装）：
+#   参见 stages/subtitle/references/pitfalls.md 与 docs/README。
+# - whisper.cpp / Topaz Video / ffmpeg 为外部二进制，路径一律写在
+#   stages/subtitle/assets/config.subtitle.example.json / config.upscale.example.json 的副本里，不进代码。

@@ -1,0 +1,29 @@
+{
+  "_comment": "drama-agent 全局配置模板（新增文件，复制为 settings.json 后填写）。所有密钥走环境变量，本文件不落 Key。",
+  "workspace_default": "<你的默认剧项目工作区>",
+  "python": "<python 3.10+ 解释器路径，建议已装 httpx/Pillow 的 venv>",
+  "paths": {
+    "_desc": "字幕链外部工具；留空则用 PATH 与字幕配置里的 tools 段",
+    "align_env_python": "",
+    "whisper_cli": "",
+    "whisper_model": "",
+    "ffmpeg": "ffmpeg"
+  },
+  "runninghub": {
+    "base_url": "<按账号所在站填写，如 https://www.runninghub.ai>",
+    "channel": "workflow",
+    "concurrency": 5,
+    "submit_gap_seconds": 2,
+    "fuse": 3
+  },
+  "video": {
+    "resolution_default": "768p",
+    "audio_mode": "native",
+    "max_ref_images_per_shot": 6
+  },
+  "retry": {
+    "max_attempts_per_shot": 3,
+    "cooldown_seconds": 300
+  },
+  "ledger": { "path": "orchestrator/ledger.jsonl" }
+}

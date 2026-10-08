@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "note": "字幕样式与规则配置 —— 改这里就能改全部字幕，不需要动代码。百分比基于 canvas 高度。",
+
+  "canvas": { "width": 1440, "height": 832 },
+
+  "safe_area": {
+    "_desc": "★ 平台字幕安全区（硬性，按【像素】判定）。距画面底部 ≥min_bottom_px像素；文本框宽度 ≤max_text_width_pct% 的视频宽度。实现里取「配置百分比边距」与「本块下限」的较大值，所以换分辨率也满足。断言 qa_safe_area() 会回读写好的 ASS 复核。",
+    "min_bottom_px": 200,
+    "max_text_width_pct": 70,
+    "_vertical_hint": "竖屏注意：字号会被「文本框宽 ÷ max_line_chars」反向压住，否则按高度百分比算出的字号会撑出安全区（1088x1920 上 zh 从 129px 压到 47px）。想让竖屏字号更大，请调小各语言的 max_line_chars（例如 16 → 12，字号可回到 63px），不要把安全区放宽。自测：python scripts/test_safe_area.py"
+  },
+
+  "tools": {
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffprobe",
+    "whisper_cli": "<whisper-cli.exe 绝对路径，如 C:\\tools\\whisper-cli\\Release\\whisper-cli.exe>",
+    "whisper_model": "<ggml 模型绝对路径，如 C:\\tools\\whisper-models\\ggml-base.bin>",
+    "whisper_lang": "zh",
+    "_whisper_note": "whisper 只用于两件事：① 判断'哪里有真实语音'（覆盖检查，音乐不算）② 备选校轴。它的时间戳较粗，不用于字幕时间",
+    "aligner": "<ctc-forced-aligner 可执行文件绝对路径，如 C:\\align-env\\Scripts\\ctc-forced-aligner.exe>",
+    "aligner_args": ["--split_size", "char", "--romanize", "--star_frequency", "edges"],
+    "_aligner_args_note": "配合【顺序约束的逐条对齐】使用：每次只喂一条台词，star_frequency 用默认 edges 最好（实测单条对齐 edges → 0.08-1.94 正确；segment 会把尾巴拉伸到 3.48）。绝不能把整段台词一起对齐——那会让首句被声学相似片段吸走（seg05 3.72/真值 0.08、seg06 4.42/真值 0.20）",
+    "aligner_env": {
+      "PYTHONUTF8": "1",
+      "PYTHONIOENCODING": "utf-8",
+      "HF_ENDPOINT": "https://hf-mirror.com"
+    },
+    "aligner_language_code": { "zh": "cmn", "es": "spa" }
+  },
+
+  "default_language": "zh",
+
+  "languages": {
+    "zh": {
+      "_desc": "中文：按字符断行，避头尾；微软雅黑已实测覆盖中文（黑体 simhei 缺西语字符，勿用于西语）",
+      "font": "Microsoft YaHei",
+      "font_size_pct": 6.7,
+      "char_width_em": 1.0,
+      "bold": true,
+      "outline": 3,
+      "shadow": 1,
+      "margin_v_pct": 8.7,
+      "margin_lr_pct": 4.2,
+      "max_line_chars": 16,
+      "line_tolerance_chars": 3,
+      "max_lines": 2,
+      "max_cue_chars": 32,
+      "cps_ok": [2.0, 8.5],
+      "cps_hard_max": 12.0,
+      "min_duration_s": 0.8,
+      "max_duration_s": 6.0,
+      "wrap": "char",
+      "break_punct": "，。！？；：…—、",
+      "forbid_line_start": "，。！？；：、）》」』…—",
+      "forbid_line_end": "（《「『",
+      "strip_chars": " "
+    },
+    "es": {
+      "_desc": "西班牙语：按【单词边界】断行，绝不切断单词；行宽按字符（Netflix 口径 42 字符/行）",
+      "font": "Microsoft YaHei",
+      "font_size_pct": 6.5,
+      "char_width_em": 0.52,
+      "bold": true,
+      "outline": 3,
+      "shadow": 1,
+      "margin_v_pct": 8.7,
+      "margin_lr_pct": 4.2,
+      "max_line_chars": 42,
+      "line_tolerance_chars": 6,
+      "max_lines": 2,
+      "max_cue_chars": 84,
+      "cps_ok": [6.0, 22.0],
+      "cps_hard_max": 26.0,
+      "min_duration_s": 0.8,
+      "max_duration_s": 6.0,
+      "wrap": "word",
+      "break_punct": ".,!?;:…—",
+      "forbid_line_start": ".,!?;:)]}»…—",
+      "forbid_line_end": "([{«",
+      "strip_chars": " "
+    }
+  },
+
+  "render": {
+    "mode": "burn",
+    "video_codec": "libx264",
+    "crf": 18,
+    "preset": "medium",
+    "pix_fmt": "yuv420p",
+    "audio_codec": "copy",
+    "audio_sample_rate": 48000
+  },
+
+  "layout": {
+    "PlayResX": 1440,
+    "PlayResY": 832,
+    "WrapStyle": 2,
+    "ScaledBorderAndShadow": "yes",
+    "primary_colour": "&H00FFFFFF",
+    "outline_colour": "&H00000000",
+    "back_colour": "&H80000000",
+    "encoding": 1
+  }
+}

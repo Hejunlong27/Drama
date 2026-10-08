@@ -1,0 +1,35 @@
+[
+  {
+    "shot_id": "shot_001",
+    "scene": "S01",
+    "scene_title": "雨夜天台",
+    "description": "雨夜天台，年轻人望向城市灯火，回身看到身后的同伴",
+    "banana_prompt": "3x3 storyboard grid, 9 panels, cinematic modern drama, rainy rooftop at night, young man in black coat looking at city lights, then turning to see his companion behind him, wet concrete reflections, neon rim light, consistent character design, cinematic lighting, --ar 16:9",
+    "ratio": "16:9",
+    "crop": { "rows": 3, "cols": 3 },
+    "character_refs": ["char_01", "char_02"],
+    "scene_refs": ["scene_01"]
+  },
+  {
+    "shot_id": "shot_002",
+    "scene": "S01",
+    "scene_title": "雨夜天台",
+    "description": "两人在天台对峙，雨水顺着脸颊滑落，情绪压到临界点",
+    "banana_prompt": "3x3 storyboard grid, 9 panels, cinematic modern drama, two characters facing each other on rainy rooftop, confrontation, rain dripping down faces, extreme tension, close-ups and over-the-shoulder shots, cold blue tone with warm rim light, --ar 16:9",
+    "ratio": "16:9",
+    "crop": { "rows": 3, "cols": 3 },
+    "character_refs": ["char_01", "char_02"],
+    "scene_refs": ["scene_01"]
+  },
+  {
+    "shot_id": "shot_003",
+    "scene": "S02",
+    "scene_title": "凌晨便利店",
+    "description": "凌晨便利店，暖黄灯光，主角独自坐在窗边看手机",
+    "banana_prompt": "3x3 storyboard grid, 9 panels, cinematic modern drama, 24h convenience store at 3am, warm yellow fluorescent light, protagonist sitting alone by the window looking at phone, reflections on glass, quiet lonely atmosphere, --ar 16:9",
+    "ratio": "16:9",
+    "crop": { "rows": 3, "cols": 3 },
+    "character_refs": ["char_01"],
+    "scene_refs": ["scene_02"]
+  }
+]

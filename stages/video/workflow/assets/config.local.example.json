@@ -1,0 +1,40 @@
+{
+  "_comment": "ai-video-pipeline 用户私有配置覆盖层。本文件放在 <工作区>/config.local.json；下划线开头的键一律视为注释。只有这份文件可由 Agent 代写，config.py 永不修改。",
+  "_layers": "优先级：config.py(默认) < config.local.json(本文件) < 环境变量(机密，如 RUNNINGHUB_API_KEY)",
+
+  "active_image_provider": "banana",
+
+  "image_providers": {
+    "banana": {
+      "kind": "workflow",
+      "id": "",
+      "nodes": {
+        "prompt":    { "nodeId": "", "fieldName": "text" },
+        "ratio":     { "nodeId": "", "fieldName": "aspectRatio" },
+        "char_ref":  { "nodeId": "", "fieldName": "image", "multi": true },
+        "scene_ref": { "nodeId": "", "fieldName": "image", "multi": true }
+      }
+    }
+  },
+
+  "h3": {
+    "kind": "workflow",
+    "id": "",
+    "frame_source": "cell_01",
+    "nodes": {
+      "prompt":      { "nodeId": "", "fieldName": "" },
+      "first_frame": { "nodeId": "", "fieldName": "" },
+      "char_ref":    { "nodeId": "", "fieldName": "" },
+      "scene_ref":   { "nodeId": "", "fieldName": "" },
+      "grid_ref":    { "nodeId": "", "fieldName": "" },
+      "duration":    { "nodeId": "", "fieldName": "" },
+      "ratio":       { "nodeId": "", "fieldName": "" }
+    }
+  },
+
+  "concurrency": 5,
+  "fuse_consecutive_fails": 2,
+  "poll_channel": "v2",
+  "data_dir": "data",
+  "out_dir": "output"
+}

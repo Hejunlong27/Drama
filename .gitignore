@@ -1,0 +1,45 @@
+# ---- 密钥与本地配置（绝不入库）----
+.env
+*.key
+config.local.json
+**/config.local.json
+**/config.assets.json
+
+# ---- 剧项目数据与产物（落工作区，不入库）----
+data/
+output/
+**/data/shots.json
+**/data/characters.json
+**/data/scenes.json
+**/data/h3_prompts.json
+**/data/refs/
+**/data/refs_h3/
+**/data/*manifest*.json
+**/data/*prompts*.json
+**/output/
+**/ledger/
+orchestrator/
+
+# 例外：引擎自带的 workspace 模板样例必须入库
+!stages/video/workflow/assets/workspace-template/
+!stages/video/workflow/assets/workspace-template/data/
+!stages/video/workflow/assets/workspace-template/data/**
+
+# ---- 运行时残留 ----
+__pycache__/
+*.pyc
+.workspace
+**/.workspace
+
+# ---- 项目专属配置（含账号/项目信息，入库仅保留 *example* 模板）----
+config.subtitle.json
+config.upscale.json
+**/config.subtitle.json
+**/config.upscale.json
+guards.*.json
+
+# ---- 系统/编辑器 ----
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
