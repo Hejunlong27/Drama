@@ -16,6 +16,24 @@
     "submit_gap_seconds": 2,
     "fuse": 3
   },
+  "comfyui": {
+    "_desc": "本地出图通道（￥0，默认通道）。注意：引擎当前从**环境变量**读取这些值（COMFYUI_URL / COMFYUI_WORKFLOW / COMFYUI_NODE_*），本段用于声明与留档；设了环境变量即可生效。",
+    "base_url": "http://127.0.0.1:8188",
+    "workflow": "<工作流 JSON 路径；留空则用 stages/assets/comfyui/workflow_qwen_image21.json>",
+    "nodes": {
+      "_desc": "换工作流必须核对节点 id，否则会把提示词写进错误的节点",
+      "prompt": "6",
+      "prefix": "2",
+      "seed": "10",
+      "aspect": "13",
+      "latent": "7"
+    },
+    "aspect_default": {
+      "char": "16:9 (Widescreen)",
+      "scene": "16:9 (Widescreen)",
+      "prop": "1:1 (Square)"
+    }
+  },
   "video": {
     "resolution_default": "768p",
     "audio_mode": "native",

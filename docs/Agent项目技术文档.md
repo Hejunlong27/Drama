@@ -109,6 +109,9 @@ drama-agent/
 | `stages/video/` | 出片引擎（并发≤5、断点续跑、熔断、probe、计费预估） | ai-video-pipeline | ✅ 原样收编 |
 | `stages/subtitle/` | CTC 对齐→ASS→无损拼接→Topaz 2K→烧录→七道断言；先放大后烧录、跑完即停 | drama-subtitle-pipeline | ✅ 原样收编（单真源） |
 | `stages/assets/` | 资产卡解析→净化（14 条纪律）→三类模板→三项自检→AI 应用提交契约 | asset-card-image-prompter | ✅ 原样收编 |
+| `stages/assets/scripts/asset_md.py` | 🆕 资产提示词 md → 本地 ComfyUI 资产清单（`manifest.json`）；纯标准库、零网络，`--list/--diff` 预览 | 新增（补「创作产物 → 引擎输入」断点） | 🆕 v1.0.0（2026-10-10），19 例离线测试 |
+| `stages/assets/comfyui/` | **本地出图引擎**：`comfy_client.py`（提交 `/prompt` → 轮询 `/history` → 取 `/view`，断点续跑）+ 示例工作流 + 节点表/适配清单 | WorkBuddy Skill `comfyui-local-imagegen` | ✅ 原样收编（2026-10-10；节点 id 与工作流路径改环境变量可覆盖） |
+| `stages/production/scripts/gen_assets_local.py` | 🆕 本地出图薄桥：md → 清单 → 调本地引擎 → 产物清单 + 零成本台账（`route=local`） | 新增 | 🆕 v1.0.0（2026-10-10） |
 | `stages/refs/` | 参考图落位接线（`<Picture N>` ↔ `character_refs` 顺序） | short-drama-production | ✅ 原样收编 |
 | `stages/qa/` | 字幕像素级验收、安全区自测、集级前置体检 | short-drama-production / drama-subtitle-pipeline | ✅ 原样收编 |
 | `tools/` | 创作层确定性工具链（init/import-bible/parse/check/convert/reindex/report/set-anchor） | ai-drama-creator | ✅ 原样收编 |
@@ -180,6 +183,8 @@ WorkBuddy 创作会话
 | `PYTHONUTF8=1` | 必须 | 中文文本处理（对齐器硬要求） |
 | `TVAI_MODEL_DIR` / `TVAI_MODEL_DATA_DIR` | 放大时 | Topaz 模型定位（可写进 configs/upscale.json 兜底） |
 | `AI_VIDEO_PIPELINE_SKILL` | 收编后不再需要 | 引擎已在项目内，路径由 settings.json 提供 |
+| `COMFYUI_URL` | 本地出图通道 | 本地 ComfyUI 地址，默认 `http://127.0.0.1:8188`（引擎已显式绕开系统代理，本机 `HTTP_PROXY` 不会劫持 127.0.0.1） |
+| `COMFYUI_WORKFLOW` / `COMFYUI_NODE_*` | 换工作流时 | 工作流 JSON 路径与五类节点 id 覆盖（`prompt/prefix/seed/aspect/latent`），**不改代码** |
 
 ---
 
@@ -262,7 +267,7 @@ planned → scripted(创作层) → ingested(门禁过) → converted(data/ 就�
 | ① 门禁 | `drama ingest --ep N` | 不过即停，列明缺陷（缺 `<d>` / 槽位超 6 / duration 不一致） | 免费 |
 | ② 转换 | `drama convert --ep N` | 生成 `data/` 四文件；`--diff` 预览不落盘 | 免费 |
 | ③ 体检 | `drama doctor` → `drama plan --ep N` | G0/G1：环境体检 + 干跑（将提交 N / 跳过 M / 缺哪些资产） | 免费 |
-| ④ 补资产 | `drama assets --kind char\|scene --only <名单>`（干跑）→ 加 `--submit` 真跑 | G1 计费确认：清单+单价+合计 | ★计费 |
+| ④ 补资产 | **默认本地**：`drama assets --engine local`（干跑）→ `--submit` 出图，￥0；**云端**：`drama assets --engine rh --kind char\|scene --only <名单>` → `--submit` | local：无计费关卡（仍需 `--submit` 表示真跑）；rh：G1 计费确认（清单+单价+合计） | ★计费（仅 rh） |
 | ⑤ 接线 | `drama refs --ep N --apply` → 复跑 ③ 复检 | 悬空槽/串位清零 | 免费 |
 | ⑥ 小样 | `drama smoke --ep N --only <段>` | G4：单段跑通、final.mp4>0 字节、**用户看过成片** | ★计费（1–2 次调用） |
 | ⑦ 全量 | `drama render --ep N`（默认 `--resume <batch>`） | G5 计费确认②后执行；并发≤5；熔断即停 | ★计费 |
@@ -441,7 +446,7 @@ drama run-episode --workspace "D:/剧/新剧A" --ep 3
 | 阶段 | 扩展 | 说明 |
 |---|---|---|
 | Phase 2 | **创作层 API 化** | 接 OpenAI 兼容端点（含本地 DeepSeek，数据不出局域网）：把 3d-short-drama-studio 的 16 角色 / ai-drama-creator 各步的技能提示词固化为 `role_prompt` 模板 + JSON Schema 输出校验；集间并行；质量用现有 E001–E011 与 ingest 门禁兜底 |
-| Phase 2 | 引擎插件化 | `channel_*` 适配器接口已统一，可加 ComfyUI / 可灵 / Seedance 直连等新通道，不动上游 |
+| Phase 2 | 引擎插件化 | `channel_*` 适配器接口已统一，可加可灵 / Seedance 直连等新通道，不动上游。**✅ 首个落地（2026-10-10）：本地 ComfyUI 出图通道** —— `drama.py assets --engine local`（￥0，见 `stages/assets/comfyui/`）；资产出图自此为「本地优先 + 云端并存」 |
 | Phase 3 | 4K 放大 | CLI 路径实测后再开（8GB 显存压力大）；先在 Topaz GUI 验证 |
 | Phase 3 | Web 面板 | `progress.json` + `ledger.jsonl` 已结构化，套一层只读看板即可（FastAPI/静态页），不碰引擎 |
 | Phase 3 | 选题→全链自动化 | short-drama-hit-topics 接入创作层 API 化后，实现「题材→成片」整夜无人值守（计费关卡保留人工） |
@@ -456,6 +461,7 @@ drama run-episode --workspace "D:/剧/新剧A" --ep 3
 |---|---|---|
 | `tools/` | ai-drama-creator | 七步流程、E001–E011 校验规则、project.json schema、STYLE LOCK 机制 |
 | `stages/assets/` | asset-card-image-prompter | 14 条净化纪律、三类模板、三项自检口径、台账存实际提交 prompt |
+| `stages/assets/comfyui/` | comfyui-local-imagegen | `POST /prompt → 轮询 /history → GET /view` 三接口契约、断点续跑（skip-existing）、"先出一张确认风格再批量"、链式模型组合（UNet+LoRA+TE-Speed+CLIP+VAE）参数表；仅节点 id／工作流路径改配置化 |
 | `stages/video/engine` | ai-video-pipeline | G0–G6 关卡、data-schema 契约、resume/taskId 复用、输出契约四段式 |
 | `stages/refs/` | short-drama-production | `<Picture N>` 落位规则、体检项（悬空槽/超 6 槽）、成本口径（≈145/段，保守 210）、清.tmp 纪律 |
 | `stages/subtitle/` | drama-subtitle-pipeline | 先放大后烧录、跑完即停、七道断言、安全区（≥200px / ≤70% 宽）、zh/es 分派 |

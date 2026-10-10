@@ -13,7 +13,8 @@ token 全花在重复探索上。这里把它们固化成**稳定命令**：
 -----------------------------------------------------------
     status     [--json]                  全盘状态面板：数据/参考图/资产缺口/批次/台账（零网络）
     preflight                            一次性体检：Key 分级 + 引擎 doctor + check + 预演（全免费）
-    assets     [--submit] [--kind ...]   缺失资产出图（默认干跑；--submit 才计费）
+    assets     [--engine local|rh] [...] 缺失资产出图（默认本地 ComfyUI ￥0 且干跑）
+                                          local=本机出图（不花钱，占 GPU）；rh=RunningHub 云端（★计费）
     refs       [--apply]                 参考图瘦身（6000px 超 H3 上限 5760 必须做）
     video plan [--limit N] [--only ids]  出片计划与成本预估（免费，不提交）
     video run  --yes [...]               真跑出片（★计费；--yes 是闸门）
@@ -47,7 +48,12 @@ from _ws import WS as _WS  # noqa: E402  ★ 工作区解析（env > 位置推�
 
 WS = _WS
 VP = WS / 'video-pipeline'
-SCRIPTS = WS / 'scripts'
+# ★ 2026-10-10 修复：收编进本仓库后，生产脚本不再住在 <工作区>/scripts/，而是**与本文件同目录**
+#   （`stages/production/scripts/`）。原先的 `WS / 'scripts'` 是上游项目布局的残留，
+#   会让 rh_doctor / cost_ledger / gen_char_assets / gen_scene_assets / gen_assets_local 全部找不到。
+#   如需复刻旧布局，用环境变量 DRAMA_SCRIPTS_DIR 覆盖。
+SCRIPTS = pathlib.Path(os.environ.get('DRAMA_SCRIPTS_DIR')
+                       or pathlib.Path(__file__).resolve().parent)
 _PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../Drama-agent
 SKILL = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
                      or _PROJECT_ROOT / 'stages' / 'video' / 'workflow')
@@ -91,12 +97,17 @@ def _harden_stdio() -> None:
 
 
 def hydrate_env() -> None:
-    names = ('RUNNINGHUB_API_KEY', 'RUNNINGHUB_ENT_API_KEY', 'RUNNINGHUB_BASE_URL',
-             'VIDEO_PIPELINE_WORKSPACE', 'VIDEO_PIPELINE_ENGINE', 'PYTHONUTF8', 'PYTHONIOENCODING')
+    # ★ 进程环境里缺的，从「用户级环境变量」补（agent 的 shell 常拿不到）：
+    #   前三个是云端通道用的 Key；DRAMA_ASSET_MD 是「资产提示词 md」真源，**本地通道也要用**。
+    want = ('RUNNINGHUB_API_KEY', 'RUNNINGHUB_ENT_API_KEY', 'RUNNINGHUB_BASE_URL', 'DRAMA_ASSET_MD')
     os.environ.setdefault('PYTHONUTF8', '1')
     os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
     os.environ['VIDEO_PIPELINE_WORKSPACE'] = str(VP)
-    missing = [n for n in names[:3] if not os.environ.get(n)]
+    # ★ 2026-10-10：把已解析出的工作区**下传给子进程**。子脚本（gen_*_assets / cost_ledger /
+    #   rh_doctor / gen_assets_local …）都靠 `_ws.resolve()` 定位工作区，而它们自己无法从
+    #   脚本位置推断出来（脚本住在仓库里，不在工作区里）—— 不传就会全部报「找不到短剧工作区」。
+    os.environ.setdefault('DRAMA_WORKSPACE', str(WS))
+    missing = [n for n in want if not os.environ.get(n)]
     if not missing or os.name != 'nt':
         return
     try:
@@ -202,6 +213,16 @@ def collect_status() -> dict:
     gen_seqs = {it.get('section') for it in char_man.get('items', [])}
     gen_scene_seqs = {it.get('section') for it in scene_man.get('items', [])}
 
+    # ★ 资产是资产，不分通道：本地 ComfyUI 出图（￥0）与云端计费出图**一并**计入「已生成」，
+    #   避免同一个角色本地出过了、面板还在喊缺口（通道信息保留在各自 manifest 里）。
+    comfy_man = read_json(VP / 'data' / 'comfyui_assets_manifest.json', {}) or {}
+    comfy_items = [it for it in comfy_man.get('items', []) if it.get('files')]
+    loc_chars = {it.get('section') for it in comfy_items if it.get('kind') == 'char'}
+    loc_scenes = {it.get('section') for it in comfy_items if it.get('kind') == 'scene'}
+    gen_chars |= {str(it.get('name')) for it in comfy_items if it.get('kind') == 'char'}
+    gen_seqs |= loc_chars
+    gen_scene_seqs |= loc_scenes
+
     miss_chars = []
     for c in char_prompts.get('characters', []):
         if c.get('have_image') or c.get('section') in gen_seqs:
@@ -259,7 +280,9 @@ def collect_status() -> dict:
         'data': {'shots': len(shots), 'prompts': len(prompts)},
         'refs': refs,
         'assets': {'char_generated': sorted(gen_chars), 'scene_generated': sorted(gen_seqs),
-                   'missing_characters': miss_chars, 'missing_scenes': miss_scenes},
+                   'missing_characters': miss_chars, 'missing_scenes': miss_scenes,
+                   'local_generated': len(comfy_items), 'local_chars': len(loc_chars),
+                   'local_scenes': len(loc_scenes)},
         'h3': {'kind': (local.get('h3') or {}).get('kind'),
                'id': (local.get('h3') or {}).get('id'),
                'prompt_node': bool((h3n.get('prompt') or {}).get('nodeId')),
@@ -323,6 +346,9 @@ def cmd_status(args) -> int:
     print('场景资产    : 已生成 %d 个 | 缺口 %d 个 %s'
           % (len(a['scene_generated']), len(a['missing_scenes']),
              ('（%s）' % '、'.join(a['missing_scenes'][:5]) + ('…' if len(a['missing_scenes']) > 5 else '')) if a['missing_scenes'] else ''))
+    if a.get('local_generated'):
+        print('本地出图    : %d 项（人物 %d / 场景 %d）— 本地 ComfyUI 通道，￥0 成本'
+              % (a['local_generated'], a['local_chars'], a['local_scenes']))
     print('Key         : 消费级-%s 企业级-%s' % (st['keys']['consumer'], st['keys']['enterprise']))
     print('台账        : %d 个任务文件 | 成功 %d / 失败 %d | 累计 %d RH币 + $%.2f 钱包'
           % (led['files'], led['success'], led['failed'], round(led['rh_coins']), led['wallet_usd']))
@@ -407,9 +433,37 @@ def cmd_preflight(args) -> int:
 
 
 # ---------------------------------------------------------------------------
-# assets：缺失资产出图（人物 → AI 应用；场景 → 闭源模型）
+# assets：缺失资产出图（默认本地 ComfyUI ￥0；可选 RunningHub 云端计费）
 # ---------------------------------------------------------------------------
+LOCAL_ASSETS_PY = SCRIPTS / 'gen_assets_local.py'
+
+
+def cmd_assets_local(args) -> int:
+    """本地 ComfyUI 通道（￥0 成本）。默认干跑；--submit 才真的出图（不花钱，占 GPU）。"""
+    if getattr(args, 'check', False):
+        print('【本地 ComfyUI 体检】（只读 /system_stats，不出图）')
+        rc, _, _ = run_cmd([sys.executable, LOCAL_ASSETS_PY, '--check'], 'assets_local_check',
+                           quiet_ok=False)
+        return rc
+    cmd = [sys.executable, LOCAL_ASSETS_PY]
+    if args.kind and args.kind != 'all':
+        cmd += ['--kind', args.kind]
+    if args.only:
+        cmd += ['--only', args.only]
+    if args.force:
+        cmd += ['--force']
+    if args.submit:
+        cmd += ['--submit']
+    print('【资产出图 · 本地 ComfyUI】%s（￥0 成本；先出一张确认风格再批量）'
+          % ('★真实出图' if args.submit else '干跑，不占 GPU'))
+    rc, _, _ = run_cmd(cmd, 'assets_local', quiet_ok=False)
+    return rc
+
+
 def cmd_assets(args) -> int:
+    if getattr(args, 'engine', 'local') == 'local':
+        return cmd_assets_local(args)
+
     kinds = [args.kind] if args.kind != 'all' else ['char', 'scene']
     total_rc = 0
     if 'char' in kinds:
@@ -601,8 +655,11 @@ GUIDE = """短剧生产线 · 速查（python scripts/drama.py <命令>）
 ════════════════════════════════════════════════════════════════════════
 看状态   status              全盘面板：数据/参考图/资产缺口/批次/台账（零网络，先跑这个）
 体检     preflight           一次过 Key 分级 + 引擎 doctor + check + 预演（全免费）
-资产     assets              缺人物/场景就出图：默认干跑，--submit 才计费
-         assets --kind char --submit --only 沈二叔,沈老太爷
+资产     assets              缺资产就出图：默认**本地 ComfyUI ￥0**，干跑
+         assets --engine local --submit            本机出图（不花钱，占 GPU；先出一张看风格）
+         assets --engine local --check             体检 ComfyUI 是否在线（不出图）
+         assets --engine local --only char_01      只出某个资产（断点续跑默认跳过已出图）
+         assets --engine rh --submit --kind char   云端计费通道（人物 27 RH币/张，场景 $0.01/张）
 参考图   refs                瘦身体检；refs --apply --write-config 才写盘+改配置
 出片     video plan          计划与成本预估（免费）；带 --limit/--only 可缩小范围
          video run --yes     真跑出片（★计费）；--limit 1 先出小样
@@ -614,7 +671,8 @@ GUIDE = """短剧生产线 · 速查（python scripts/drama.py <命令>）
          cost --checkpoint   ★ 收工结账：打印台账 + 记基线，下次即可看「单次任务增量」
 ════════════════════════════════════════════════════════════════════════
 铁律：默认不花钱（要 --submit / --yes）；中断后一律用 --resume 续跑，不重新提交。
-成本   ：人物 17-23 RH币/张 | 场景 $0.01/张 | 视频实测 78-209 RH币/段（与时长无关）
+成本   ：资产 本地 ComfyUI ￥0 / 云端人物 17-27 RH币/张 / 场景 $0.01/张 | 视频 78-209 RH币/段
+通道   ：assets --engine local（本地，￥0，默认）| rh（云端，★计费）
 口径   ：消耗只认平台按任务返回的 usage —— **不用余额差值倒推消耗**
 日志   ：video-pipeline/output/logs/   台账：video-pipeline/ledger/runs/
 成本表 ：docs/成本台账.md（由 cost 命令生成）
@@ -663,11 +721,16 @@ def main() -> int:
     p = sub.add_parser('preflight', help='一次过体检（免费）')
     p.set_defaults(fn=cmd_preflight)
 
-    p = sub.add_parser('assets', help='缺失资产出图（默认干跑）')
-    p.add_argument('--submit', action='store_true', help='★真的生成（人物 27 RH币/张，场景 $0.01/张）')
-    p.add_argument('--kind', choices=('char', 'scene', 'all'), default='all')
-    p.add_argument('--only', default=None, help='只做这些（名字或序号，逗号分隔）')
-    p.add_argument('--force', action='store_true', help='已生成的也重跑（会重复计费）')
+    p = sub.add_parser('assets', help='缺失资产出图（默认本地 ComfyUI ￥0，干跑）')
+    p.add_argument('--engine', choices=('local', 'rh'), default='local',
+                   help='出图通道：local=本地 ComfyUI（￥0，默认）；rh=RunningHub 云端（★计费）')
+    p.add_argument('--submit', action='store_true',
+                   help='真的出图：local 占 GPU 不花钱；rh ★计费（人物 27 RH币/张，场景 $0.01/张）')
+    p.add_argument('--kind', choices=('all', 'char', 'scene', 'prop'), default='all',
+                   help='只做某一类（prop 仅本地通道支持）')
+    p.add_argument('--only', default=None, help='只做这些（名字或序号 / 资产 id，逗号分隔）')
+    p.add_argument('--force', action='store_true', help='已生成的也重跑（rh 通道会重复计费）')
+    p.add_argument('--check', action='store_true', help='仅 local：体检 ComfyUI 是否在线，不出图')
     p.set_defaults(fn=cmd_assets)
 
     p = sub.add_parser('refs', help='参考图瘦身')

@@ -3,6 +3,7 @@
 - 收编日期：2026-10-08
 - 收编方式：**拷贝固化**（副本为唯一运行真源，原 Skill 包不再承担引擎职责）
 - 2026-10-08 更新：按新宗旨（让所有人都可以做AI短剧，每个人都可以把自己的故事拍出来！！！）决策移除免费通道（rh-free-h3-video），出片仅保留「AI 应用 + 工作流」标准通道
+- **2026-10-10 更新**：新增**本地 ComfyUI 资产出图通道**（收编自 WorkBuddy Skill `comfyui-local-imagegen`），资产出图改为**默认本地（￥0）**、云端计费通道并存；同时修复两处收编遗留缺陷（`drama.py` 的脚本路径与工作区下传）
 - 完整性校验：`manifest.sha256`（每文件 SHA-256，可用 `Get-FileHash` / `sha256sum -c` 核对）
 - 依赖锁定：`requirements.txt`（httpx==0.28.1 / Pillow==12.2.0，实测 Python 3.13）
 
@@ -15,6 +16,9 @@
 | `stages/subtitle/` | WorkBuddy Skill `drama-subtitle-pipeline` | 2026-09-20 四缺陷修复版 + 2026-10-06 安全区/竖屏标定 | `subtitle.py` + `upscale.py`（单真源）+ compare/cost 工具 + config 模板 + references |
 | `stages/production/` | WorkBuddy Skill `short-drama-production` | 2026-10-08 在用版 | 总控 `drama.py`、体检 `episode_preflight.py`、资产 `gen_char_assets.py` / `gen_scene_assets.py`、接线 `wire_*.py` / `prepare_refs.py`、成本 `cost_*.py`、验收 `_qa_subtitle_frame.py` + references |
 | `stages/assets/` | WorkBuddy Skill `asset-card-image-prompter` | 2026-10-05 实战版（28 例离线测试全绿） | 净化器 `sanitize.py` + 三类模板 `prompt_templates.py` + 离线测试 + references（AI 应用提交契约 / 踩坑全录） |
+| `stages/assets/comfyui/` | WorkBuddy Skill `comfyui-local-imagegen` | **2026-10-10 收编** | **本地出图引擎**：`comfy_client.py`（纯标准库、零第三方依赖、不出网）+ `workflow_qwen_image21.json` 示例工作流 + references（出图流程 / 节点表与换工作流适配） |
+| `stages/assets/scripts/asset_md.py` | 新增（补断点：创作产物 → 引擎输入） | **v1.0.0（2026-10-10）** | 资产提示词 md → 本地 ComfyUI 清单（纯标准库）；配套 19 例离线测试 |
+| `stages/production/scripts/gen_assets_local.py` | 新增（薄桥） | **v1.0.0（2026-10-10）** | 生产总控侧本地出图桥：md → 清单 → 调本地引擎 → 产物清单 + 零成本台账 |
 | `tools/` | 项目工具链 `D:\AI-Drama\parallel-me\tools` | 2026-09 版 | 创作层确定性工具：init / import-bible / parse / check / convert / reindex / report / set-anchor / gen(stub) |
 | `docs/creation/` | WorkBuddy Skill `ai-drama-creator` references | 2026-09 版 | 创作层方法论：FFS 规范 / 转换规则 / QA 门 / STYLE LOCK 预设 / 流水线落盘规范 |
 
@@ -44,6 +48,19 @@
 | `stages/subtitle/references/*.md`、`stages/production/references/*.md`、`stages/assets/references/runninghub-ai-app-提交契约.md` | 个人路径 / 账号 ID / webapp ID → 占位符 | 开源卫生 |
 | `tools/cli.py`、`docs/creation/pipeline.md` | 用法示例路径泛化 | 去本机项目路径 |
 
+### 2026-10-10 新增/修复（本地 ComfyUI 通道）
+
+| 文件 | 改动 | 原因 |
+|---|---|---|
+| `stages/assets/comfyui/comfy_client.py` | 五类节点 id 改为 `COMFYUI_NODE_{PROMPT,PREFIX,SEED,ASPECT,LATENT}` 可覆盖；工作流路径改为 `COMFYUI_WORKFLOW` 可覆盖；新增**空代理 opener**；`--check` 失败改为友好 JSON + 退出码 1；清单级 `style_lock` 会在批量路径生效 | 从「改代码换工作流」变为「改配置换工作流」；**实测**：环境存在 `HTTP_PROXY` 时 urllib 会把 `127.0.0.1:8188` 也塞进代理，返回 `HTTP Error 502`；失败不再是原始 traceback |
+| `stages/assets/comfyui/workflow_qwen_image21.json` | 节点 6 的示例提示词中性化（原为第三方动漫角色示例）；`filename_prefix` 由 `LQ-` 改为 `drama` | 开源卫生（不携带他人作品示例） |
+| `stages/assets/scripts/asset_md.py` | 新增（纯标准库）。解析口径与 `gen_char_assets.py` / `gen_scene_assets.py` **同为**「`# 一、角色资产库` / `# 二、场景资产` / `# 三、道具资产`；`## N. 名字` 节内 ``` 块 = 提示词」。**刻意不 import 既有引擎**，以免把 httpx / RunningHub 客户端拖进零成本的本地通道 | 补「创作产物 → 引擎输入」断点；本地通道不得被云端依赖拖累 |
+| `stages/assets/scripts/tests/test_asset_md.py` | 新增 19 例离线测试（零网络零计费） | 转换器是确定性的，应可回归 |
+| `stages/production/scripts/gen_assets_local.py` | 新增（薄桥） | 生产总控侧统一入口，与云端两脚本并列 |
+| `stages/production/scripts/drama.py` | ① `SCRIPTS` 由 `<工作区>/scripts` 改为**本文件所在目录**（`DRAMA_SCRIPTS_DIR` 可覆盖）；② `hydrate_env()` 下传 `DRAMA_WORKSPACE`、并把 `DRAMA_ASSET_MD` 纳入用户级环境变量补全；③ `assets` 子命令新增 `--engine {local,rh}` 与 `--check`，`--kind` 增加 `prop`；④ 状态面板聚合本地通道产物（资产不分通道，一并计入「已生成」） | **修复收编遗留缺陷**：脚本已住在仓库内（`stages/production/scripts/`），原 `<工作区>/scripts` 写法会让 `rh_doctor` / `cost_ledger` / `gen_char_assets` / `gen_scene_assets` **全部找不到**；子脚本也无法从自身位置推断工作区（脚本不在工作区里） |
+| `configs/settings.example.json` | 新增 `comfyui` 段（base_url / workflow / 节点映射 / aspect 默认） | 配置单点，不硬编码 |
+| `README.md`、`docs/Agent项目技术文档.md` | 新增本地通道的定位、命令、配置与模块表 | 文档同步 |
+
 **行为不变性说明**：所有改动不触碰提交/轮询/下载/对齐/渲染/计费守卫等任何业务逻辑；在原环境设置相同环境变量时行为与源版本一致；未设环境变量时按仓库内缺省或显式报错（不再静默指向个人机器路径）。
 
 ## 三、运行时排除项（未收编）
@@ -72,4 +89,9 @@ pip install -r requirements.txt
 python stages/video/workflow/scripts/run.py doctor --json
 python stages/assets/scripts/sanitize.py --selftest
 python stages/assets/scripts/tests/test_prompter.py
+python stages/assets/scripts/tests/test_asset_md.py
+
+# 4) 本地出图通道（零第三方依赖，不需要任何 Key；需本机 ComfyUI 在跑）
+python stages/assets/comfyui/comfy_client.py --check
+python stages/production/scripts/drama.py assets --engine local          # 干跑
 ```
