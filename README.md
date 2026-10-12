@@ -19,18 +19,64 @@ AI 短剧批量生产的**本地执行引擎集**：从「已写好的分镜/视
 ```
 Drama-agent/
 ├── stages/
+│   ├── creation/          ★ 西语漫剧创作链路（① 榜单调研与对比 → ② 爆款拆解 → ③ 选题定位 → ④ 剧本改写）
 │   ├── video/workflow/    批量出片引擎（RunningHub 工作流/AI 应用：九宫格出图→裁剪→H3 视频）
 │   ├── subtitle/          字幕引擎（CTC 强制对齐→ASS→无损拼接→Topaz 2K 放大→烧录→七道断言）
-│   ├── production/        一集总控（体检/补资产/参考图接线/出片调度/验收/成本台账）
+│   ├── production/        一集总控（模型门禁/体检/补资产/参考图接线/出片调度/验收/成本台账）
 │   └── assets/            资产出图：提示词净化器 + 三类模板 + md→清单转换器 + 离线测试
 │       └── comfyui/       ★ 本地 ComfyUI 出图引擎（￥0 成本、零第三方依赖、不出网）
 ├── tools/                 创作层确定性工具（项目初始化/锚点入库/剧本校验/格式转换）
 ├── docs/                  设计文档与创作层方法论
-├── configs/               配置模板
+├── configs/               配置模板（含 model-plan.example.json 模型确认单）
 ├── requirements.txt       锁定依赖
 ├── manifest.sha256        引擎文件指纹（防篡改/防漂移）
 └── VERSIONS.md            收编来源、版本标记、改动清单
 ```
+
+## 前置条件：首次生图 / 出片前先确认模型
+
+**每个项目，在首次生图与首次生成视频之前，必须先确认模型选择**，选项为
+**本地 ComfyUI（￥0）/ RunningHub（★计费）/ 闭源模型（★计费）**。
+确认结果写入 `<工作区>/model-plan.json`；未确认时计费动作会被拦下（退出码 4）。
+
+```powershell
+# 查看状态 / 可选清单 / 交互式确认 / 命令行确认
+python stages/production/scripts/drama.py models status
+python stages/production/scripts/drama.py models list
+python stages/production/scripts/drama.py models --ask
+python stages/production/scripts/drama.py models set image=local_comfyui video=runninghub
+# 换模型：先清除再重确认
+python stages/production/scripts/drama.py models reset image
+```
+
+> 门禁不仅拦「未确认」，也拦「确认一套、跑另一套」：确认了本地 ComfyUI 却 `--engine rh`，
+> 会要求先改确认单再执行。
+
+## 西语 AI 漫剧创作链路（stages/creation · 四部分）
+
+从市场调研到剧本改写，四个**职责单一、产物落盘、可机器校验**的部分，
+并**对接现有 agent 体系**（`tools/cli.py` + `drama.py`）：
+
+| 部分 | 做什么 | 关键约束 |
+|---|---|---|
+| **① 榜单调研与对比** | 多市场榜单 + 北美/东南亚/拉美横向对比（**西语重点**） | 覆盖度门禁（近 2 个月 + 多市场 + **必须含西语市场**）不过则不往下走 |
+| **② 爆款拆解** | 题材类型分布 / 剧情套路库 / 爆点元素 / 榜单洞察 / 内容偏好 / 差异化趋势 | 结论必须可回指到数据条目 |
+| **③ 选题定位** | 候选 → 七维评分 → **定位卡**（受众画像 / 题材方向 / 差异化卖点） | 评分依据逐维必填；合规 ≤3 一票否决；同赛道 Top-N ≤1 |
+| **④ 剧本改写** | 源剧本 → **N 集规划（默认 60）**，每集含核心冲突 / 反转 / 钩子；FFS 骨架 + 自检 | 三件套缺一不可；爆点节拍（中型每 6 集 / 大型每 15 集） |
+
+```powershell
+PY=<python 3.10+ 解释器>
+WS="D:/剧/新剧"
+# 初始化项目（建目录 + 拷入 tools/ + 写 project.json + 生成 brief 与数据模板）
+$PY stages/creation/scripts/creation.py scaffold --workspace $WS `
+      --slug mi-venganza --title "Mi venganza tiene garras" --platform ReelShort --ep 60 --sec 90
+# 四部分：market check/compare → breakdown analyze → topic score → hit select → script plan/build/lint
+$PY stages/creation/scripts/creation.py --workspace $WS status
+# 离线自检（①-④，49 例）
+$PY stages/creation/scripts/tests/test_creation_pipeline.py
+```
+
+详见 `stages/creation/README.md` 与 `stages/creation/references/module-contracts.md`。
 
 ## 资产出图的三条路（`drama.py assets --engine`）
 
@@ -96,6 +142,10 @@ python stages/video/workflow/scripts/run.py --resume <batch_id>    # 全量/续�
 |---|---|
 | 改造背景、可行性分析（含免费通道移除决策记录） | `docs/可行性检查报告.md` |
 | 架构、数据契约、执行流程 | `docs/Agent项目技术文档.md` |
+| **西语漫剧创作链路（四部分）** | `stages/creation/README.md` |
+| **创作层模块职责与数据契约** | `stages/creation/references/module-contracts.md` |
+| **西语与多市场基线（近 2 个月）** | `stages/creation/references/spanish-market.md` |
+| **七维评分模型** | `stages/creation/references/scoring-model.md` |
 | 出片数据契约 | `stages/video/workflow/references/data-schema.md` |
 | RunningHub API 行为契约 | `stages/video/workflow/references/runninghub-contract.md` |
 | 字幕对齐/样式/放大 | `stages/subtitle/references/` |

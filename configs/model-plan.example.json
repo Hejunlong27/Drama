@@ -1,0 +1,38 @@
+{
+  "_comment": "model-plan.json —— 模型选择确认单模板（前置条件门禁）。由 `drama.py models` 写入 <工作区>/model-plan.json，本文件仅作留档与示例。请勿把真实确认单提交进本仓库。",
+  "gate_version": 1,
+  "_规则": [
+    "每个项目在**首次生图**与**首次出片**前，必须先确认模型选择，选项为：本地 ComfyUI / RunningHub / 闭源模型。",
+    "未确认时，drama.py assets --submit 与 drama.py video run --yes 会拦下并返回退出码 4（等待用户确认）。",
+    "确认了某通道，却用另一通道执行（如确认本地却 --engine rh）同样会被拦下，防账实不符。",
+    "换模型：先 `drama models reset <kind>` 再 `drama models set <kind>=<choice>` 重新确认。"
+  ],
+  "models": {
+    "image": {
+      "choice": "local_comfyui",
+      "label": "本地 ComfyUI（￥0）",
+      "cost": "￥0（占本机 GPU/电费）",
+      "engine_arg": "local",
+      "confirmed": false,
+      "confirmed_at": null,
+      "confirmed_by": null,
+      "detail": {}
+    },
+    "video": {
+      "choice": "runninghub",
+      "label": "RunningHub 工作流（★计费）",
+      "cost": "约 78-209 RH币/段（按帧数）",
+      "engine_arg": "workflow",
+      "confirmed": false,
+      "confirmed_at": null,
+      "confirmed_by": null,
+      "detail": {}
+    }
+  },
+  "_可选值": {
+    "image": ["local_comfyui", "runninghub", "closed_source"],
+    "video": ["local_comfyui", "runninghub", "closed_source"]
+  },
+  "_闭源模型说明": "可灵/即梦/Midjourney/Nano Banana(Gemini)/Veo/Sora/Runway 等；本仓库不直连，由人工在各平台出图/出片后落盘到工作区，引擎按本地文件接管。",
+  "history": []
+}

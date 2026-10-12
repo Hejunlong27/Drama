@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "generated_at": "<YYYY-MM-DD，检索当天>",
+  "market": "es-LATAM",
+  "market_label": "西语（拉美 + 西班牙）—— 重点市场",
+  "window": {
+    "from": "<YYYY-MM-DD：检索日往前推 2 个月>",
+    "to": "<YYYY-MM-DD：检索日>",
+    "months": 2
+  },
+  "markets": [
+    {
+      "id": "<na>",
+      "name": "<北美>",
+      "lang": "<en>",
+      "region": "<US/CA>",
+      "downloads_share_pct": "<全球短剧下载占比，数字或无>",
+      "mau": "<月活，如 2400万>",
+      "monetization": "<IAP/IAAP/IAA 与客单价>",
+      "top_genres": [
+        "<狼人>",
+        "<霸总>"
+      ],
+      "competition": "<high|mid|low>",
+      "note": "<该市场横向对比要点>"
+    },
+    {
+      "id": "es-latam",
+      "name": "拉美（西语）",
+      "lang": "es",
+      "region": "MX/CO/AR/CL/PE",
+      "downloads_share_pct": "<…>",
+      "mau": "<…>",
+      "monetization": "<…>",
+      "top_genres": [
+        "<霸总>",
+        "<狼人>",
+        "<复仇>"
+      ],
+      "competition": "<…>",
+      "note": "<西语一套内容覆盖十余国，翻译成本摊薄；付费能力弱于美国>"
+    }
+  ],
+  "platforms": [
+    {
+      "id": "<reelshort>",
+      "name": "<ReelShort>",
+      "region": "<US/LATAM/ES>",
+      "note": "<西语区表现>"
+    }
+  ],
+  "rankings": [
+    {
+      "id": "R01",
+      "platform": "<ReelShort>",
+      "market": "<es-LATAM>",
+      "rank": 1,
+      "title": "<剧名>",
+      "title_zh": "<中文译名>",
+      "track": "<狼人奇幻 / 霸总 / 复仇 …>",
+      "heat": "<high|mid|low>",
+      "date": "<YYYY-MM-DD：榜单日期>",
+      "url": "<链接>"
+    }
+  ],
+  "hits": [
+    {
+      "id": "H01",
+      "title": "<西语原名>",
+      "title_zh": "<中文译名>",
+      "platform": "<ReelShort>",
+      "lang": "es",
+      "track": "<狼人奇幻/女频逆袭/霸总/复仇>",
+      "tags": [
+        "<werewolf>",
+        "<revenge>"
+      ],
+      "added": "<YYYY-MM-DD>",
+      "heat": "<high>",
+      "hook": "<一句钩子>",
+      "evidence": "<来源>"
+    }
+  ],
+  "trends": [
+    {
+      "id": "T01",
+      "date": "<YYYY-MM-DD>",
+      "topic": "<一句话趋势>",
+      "dim": "<hotspot|trend|preference>",
+      "evidence": "<支撑数据>",
+      "source": "<来源名>"
+    }
+  ],
+  "audience": {
+    "regions": [
+      "<Mexico>"
+    ],
+    "age": "18-45",
+    "gender": "<女频为主>",
+    "note": "<画像补充>"
+  },
+  "genre_heat": [
+    {
+      "genre": "<霸总/CEO>",
+      "score": 9,
+      "evidence": "<依据>"
+    }
+  ],
+  "compliance_notes": [
+    {
+      "date": "<YYYY-MM-DD>",
+      "note": "<监管/平台口径变化>"
+    }
+  ],
+  "sources": [
+    {
+      "title": "<标题>",
+      "url": "<url>",
+      "date": "<YYYY-MM-DD>"
+    }
+  ]
+}

@@ -112,6 +112,8 @@ drama-agent/
 | `stages/assets/scripts/asset_md.py` | 🆕 资产提示词 md → 本地 ComfyUI 资产清单（`manifest.json`）；纯标准库、零网络，`--list/--diff` 预览 | 新增（补「创作产物 → 引擎输入」断点） | 🆕 v1.0.0（2026-10-10），19 例离线测试 |
 | `stages/assets/comfyui/` | **本地出图引擎**：`comfy_client.py`（提交 `/prompt` → 轮询 `/history` → 取 `/view`，断点续跑）+ 示例工作流 + 节点表/适配清单 | WorkBuddy Skill `comfyui-local-imagegen` | ✅ 原样收编（2026-10-10；节点 id 与工作流路径改环境变量可覆盖） |
 | `stages/production/scripts/gen_assets_local.py` | 🆕 本地出图薄桥：md → 清单 → 调本地引擎 → 产物清单 + 零成本台账（`route=local`） | 新增 | 🆕 v1.0.0（2026-10-10） |
+| `stages/production/scripts/model_gate.py` | 🆕 **模型选择门禁**（前置条件）：首次生图/出片前确认模型（本地 ComfyUI / RunningHub / 闭源模型）；确认单落 `<工作区>/model-plan.json`，含通道一致性校验 | 新增 | 🆕 v1.0.0（2026-10-12），19 例离线测试 |
+| `stages/creation/` | 🆕 **西语漫剧创作链路（四部分）**：① 榜单调研与对比 → ② 爆款拆解 → ③ 选题定位 → ④ 剧本改写；确定性脚本 + 4 个 LLM 提示词 + 参考库 | 新增 | 🆕 v1.0.0（2026-10-12），49 例离线测试 |
 | `stages/refs/` | 参考图落位接线（`<Picture N>` ↔ `character_refs` 顺序） | short-drama-production | ✅ 原样收编 |
 | `stages/qa/` | 字幕像素级验收、安全区自测、集级前置体检 | short-drama-production / drama-subtitle-pipeline | ✅ 原样收编 |
 | `tools/` | 创作层确定性工具链（init/import-bible/parse/check/convert/reindex/report/set-anchor） | ai-drama-creator | ✅ 原样收编 |
@@ -149,6 +151,48 @@ WorkBuddy 创作会话
 │   └── ledger.jsonl         ← 🆕 统一台账（追加式）
 └── docs/成本台账_<剧名>.xlsx ← 主交付物（原口径）
 ```
+
+---
+
+### 2.5 新增（2026-10-12）：模型门禁与西语漫剧创作链路
+
+#### 2.5.1 模型选择门禁（前置条件）
+
+**规则**：每个项目，在**首次生图**与**首次生成视频**前，必须**先向用户确认模型选择**；
+选项为 **本地 ComfyUI（￥0）/ RunningHub（★计费）/ 闭源模型（★计费）**；经确认后方可执行。
+
+| 项 | 说明 |
+|---|---|
+| 确认单 | `<工作区>/model-plan.json`（模板 `configs/model-plan.example.json`；**不进仓库**） |
+| 命令 | `drama models status/list/set/reset/ask`（`--workspace` 可写在主命令或子命令位置） |
+| 拦截点 | `drama assets --submit`（图像，含 local 与 rh 两路）与 `drama video run --yes`（视频） |
+| 拦截语义 | 未确认 → 打印三选一菜单 + 可照抄确认命令，**退出码 4（等待用户确认）** |
+| 附加校验 | 确认了 A 通道却跑 B 通道（如确认本地却 `--engine rh`）→ 同样拦下，防账实不符 |
+| 只拦首次 | 确认后不再询问；换模型需 `models reset <kind>` 后重确认 |
+
+#### 2.5.2 西语 AI 漫剧创作链路（`stages/creation/` · 四部分）
+
+按交付**四部分**组织，职责单一、流程连贯、产物落盘、可机器校验，对接现有 agent 体系：
+
+| 部分 | 脚本 | 关键约束 | 产物 |
+|---|---|---|---|
+| **① 榜单调研与对比** | `market_data.py` | 覆盖度门禁：窗口跨度 ≥55 天、右端 ≤7 天前、近 30 天 ≥3 条、市场 ≥3 个且**必须含西语市场**、榜单 ≥8 条；不过则②拒绝执行 | `creation/market/market-data.json` |
+| **② 爆款拆解** | `hit_breakdown.py` | 题材分布 / 剧情套路库 / 爆点元素频次 / 榜单洞察 / 内容偏好（西语置顶）/ 差异化趋势（长尾·未饱和·窗口期） | `creation/01-breakdown/breakdown.json/.md` |
+| **③ 选题定位·A** | `topic_analysis.py` | 七维加权评分（权重合计 1.0）；`score_basis` 逐维必填；合规 ≤3 一票否决；三维交叉；赛道占比 >40% 降级；萃取**定位三要素** | `creation/02-positioning/candidates.json/.md` |
+| **③ 选题定位·B** | `hit_selection.py` | 否决/不合格隔离；同赛道 Top-N 最多 1 个；对标匹配 + ②拆解校准 → **定位卡** | `creation/02-positioning/positioning.json/.md` |
+| **④ 剧本改写** | `script_rewrite.py` | 源剧本登记；**N 集规划（默认 60）**，每集**核心冲突 + 反转 + 钩子**；爆点节拍（中型每 6 集 / 大型每 15 集）；FFS 骨架（8 字段 / 90–120 秒 / 6–15 镜）+ 结构自检 | `creation/03-script/blueprint.json/.md` + `script-brief.md` + `skeleton_ep_XX.md` |
+
+**数据契约**：①→② 用 `markets/rankings/hits/trends`（记录 id 回指）；②→③ 用 `tropes/boom_elements/content_preferences`；
+③A→③B 用 `status ∈ kept|demoted|vetoed|error`；③B→④ 用 `selected[].rank` 与定位卡；
+④→引擎 用 `style_lock/episodes`（FFS HEADER 与分镜 E011 口径一致）。
+详见 `stages/creation/references/module-contracts.md`。
+
+**对接现有体系**：`creation.py scaffold` 自动建目录 + 拷入 `tools/` + 跑 `tools/cli.py init`
+（写 `project.json`/`bible/stylelock.md`/数据库）；④ 正文经 `tools/cli.py check/convert` 后进入
+`drama.py` 执行链（模型门禁 → 资产 → 接线 → 出片 → 字幕 → 验收）。
+
+**市场数据「近 2 个月」**：基线见 `stages/creation/references/spanish-market.md`
+（含 2026-09 多市场横向对比：北美/东南亚/拉美西语，及对标剧）；执行前一律按 `market queries` 重新检索并刷新缓存。
 
 ---
 

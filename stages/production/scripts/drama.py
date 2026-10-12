@@ -12,12 +12,15 @@ token 全花在重复探索上。这里把它们固化成**稳定命令**：
 命令一览（`python scripts/drama.py guide` 也会打印同样内容）
 -----------------------------------------------------------
     status     [--json]                  全盘状态面板：数据/参考图/资产缺口/批次/台账（零网络）
+    models     [list|status|set|reset|ask]  ★前置条件：首次生图/出片前确认模型
+                                          （本地 ComfyUI / RunningHub / 闭源模型 三选一，写 model-plan.json）
     preflight                            一次性体检：Key 分级 + 引擎 doctor + check + 预演（全免费）
     assets     [--engine local|rh] [...] 缺失资产出图（默认本地 ComfyUI ￥0 且干跑）
                                           local=本机出图（不花钱，占 GPU）；rh=RunningHub 云端（★计费）
+                                          ★首次 --submit 前会先查模型选择门禁
     refs       [--apply]                 参考图瘦身（6000px 超 H3 上限 5760 必须做）
     video plan [--limit N] [--only ids]  出片计划与成本预估（免费，不提交）
-    video run  --yes [...]               真跑出片（★计费；--yes 是闸门）
+    video run  --yes [...]               真跑出片（★计费；--yes 是闸门；★首次前会先查模型选择门禁）
     video status [BATCH]                 某批次进度（读 summary.json）
     report     [--latest|--batch ID]     战报：批次汇总 + 台账聚合 + 成本
     balance                              两把 Key 的余额（只读，不计费）
@@ -27,6 +30,8 @@ token 全花在重复探索上。这里把它们固化成**稳定命令**：
 设计约定（照用户偏好来的）
 --------------------------
 * **默认不花钱**：所有会提交任务的命令都要显式 `--submit` / `--yes`，否则只干跑。
+* **模型先确认**：每个项目**首次生图 / 首次出片**前必须先确认模型选择（本地 ComfyUI /
+  RunningHub / 闭源模型）；确认单落 `<工作区>/model-plan.json`，未确认即停（退出码 4）。
 * **进度可见**：子进程输出实时落日志文件，同时打印进度行；失败才回显日志尾部。
 * **战报优先**：成功路径只打印几行摘要 + 产物绝对路径；不贴长日志。
 * **机密不进文件**：Key 只从环境变量/用户级环境变量读，永不写盘、永不打印全文。
@@ -59,6 +64,7 @@ SKILL = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
                      or _PROJECT_ROOT / 'stages' / 'video' / 'workflow')
 RUN_PY = SKILL / 'scripts' / 'run.py'
 CHECK_BILLING = SKILL / 'scripts' / 'check_billing.py'
+MODEL_GATE_PY = SCRIPTS / 'model_gate.py'      # ★ 首次生图/出片前的模型选择门禁
 LOG_DIR = VP / 'output' / 'logs'
 
 CNY_PER_RH = 0.0025          # 1 RH币 ≈ ¥0.0025（用户 2026-09-18）；★ 2026-09-19 用户另给 RH币↔USD：
@@ -433,6 +439,47 @@ def cmd_preflight(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# models：首次生图 / 出片前的「模型选择」门禁（前置条件）
+# ---------------------------------------------------------------------------
+def _model_gate(kind: str, expected_engine=None) -> int:
+    """查门禁。返回 0 = 放行；4 = 等待用户确认（★关卡停点）；2 = 其它问题。
+
+    规则（详见 stages/production/scripts/model_gate.py）：
+      * 每个项目在**首次生图 / 首次出片**前，必须先确认模型选择；
+      * 确认单落在 <工作区>/model-plan.json（不进仓库）；
+      * 确认了 A 却跑 B（如确认本地却用 --engine rh）→ 同样拦下，防账实不符。
+    """
+    import model_gate
+    ok, msg = model_gate.require(WS, kind, expected_engine=expected_engine)
+    if ok:
+        print('  [门禁] %s' % msg)
+        return 0
+    print(model_gate.render_confirm_request(kind, WS))
+    print('[门禁] %s' % msg)
+    return model_gate.EXIT_WAIT_CONFIRM
+
+
+def cmd_models(args) -> int:
+    """转发给 model_gate.py（status / list / set / reset / ask / require）。"""
+    cmd = [sys.executable, MODEL_GATE_PY, '--workspace', str(WS)]
+    if getattr(args, 'models_cmd', None) == 'list':
+        cmd.append('list')
+    elif getattr(args, 'models_cmd', None) == 'set':
+        cmd += ['set'] + list(args.pairs or [])
+        if getattr(args, 'detail', None):
+            cmd += ['--detail', args.detail]
+    elif getattr(args, 'models_cmd', None) == 'reset':
+        cmd += ['reset', args.kind]
+    elif getattr(args, 'models_cmd', None) == 'ask':
+        cmd += ['ask', args.kind]
+    else:                                    # 默认 status
+        cmd.append('status')
+        if getattr(args, 'json', False):
+            cmd.append('--json')
+    return run_cmd(cmd, 'models', quiet_ok=False)[0]
+
+
+# ---------------------------------------------------------------------------
 # assets：缺失资产出图（默认本地 ComfyUI ￥0；可选 RunningHub 云端计费）
 # ---------------------------------------------------------------------------
 LOCAL_ASSETS_PY = SCRIPTS / 'gen_assets_local.py'
@@ -445,6 +492,10 @@ def cmd_assets_local(args) -> int:
         rc, _, _ = run_cmd([sys.executable, LOCAL_ASSETS_PY, '--check'], 'assets_local_check',
                            quiet_ok=False)
         return rc
+    if args.submit:                       # ★ 首次生图前：模型选择门禁
+        rc = _model_gate('image', expected_engine='local')
+        if rc:
+            return rc
     cmd = [sys.executable, LOCAL_ASSETS_PY]
     if args.kind and args.kind != 'all':
         cmd += ['--kind', args.kind]
@@ -464,6 +515,10 @@ def cmd_assets(args) -> int:
     if getattr(args, 'engine', 'local') == 'local':
         return cmd_assets_local(args)
 
+    if args.submit:                       # ★ 首次生图前：模型选择门禁（云端通道）
+        rc = _model_gate('image', expected_engine='rh')
+        if rc:
+            return rc
     kinds = [args.kind] if args.kind != 'all' else ['char', 'scene']
     total_rc = 0
     if 'char' in kinds:
@@ -543,6 +598,9 @@ def cmd_video_run(args) -> int:
                  ' --only %s' % args.only if args.only else ''))
         cmd_video_plan(argparse.Namespace(limit=args.limit, only=args.only))
         return 2
+    rc = _model_gate('video', expected_engine='workflow')   # ★ 首次出片前：模型选择门禁
+    if rc:
+        return rc
     est = estimate_video(args.limit, args.only.split(',') if args.only else None)
     print('★ 开始真实出片：%d 段，预估约 %d RH币 ≈ ￥%.2f' % (est['segments'], est['rh_coins'], est['cny']))
     cmd = [sys.executable, RUN_PY, '--video-only']
@@ -654,6 +712,11 @@ def cmd_refs(args) -> int:
 GUIDE = """短剧生产线 · 速查（python scripts/drama.py <命令>）
 ════════════════════════════════════════════════════════════════════════
 看状态   status              全盘面板：数据/参考图/资产缺口/批次/台账（零网络，先跑这个）
+模型     models              ★前置条件：首次生图/出片前必须确认模型（本地/云端/闭源三选一）
+         models --ask        交互式引导确认（生图；换 video 传 models ask video）
+         models list         可选清单：本地ComfyUI(￥0) / RunningHub(★计费) / 闭源模型(★计费)
+         models set image=local_comfyui video=runninghub    记录确认（可一次两条）
+         models reset video  换模型：先清除再重确认
 体检     preflight           一次过 Key 分级 + 引擎 doctor + check + 预演（全免费）
 资产     assets              缺资产就出图：默认**本地 ComfyUI ￥0**，干跑
          assets --engine local --submit            本机出图（不花钱，占 GPU；先出一张看风格）
@@ -737,6 +800,26 @@ def main() -> int:
     p.add_argument('--apply', action='store_true', help='真的写盘')
     p.add_argument('--write-config', action='store_true', help='顺带把 characters.json 指到新目录')
     p.set_defaults(fn=cmd_refs)
+
+    # ★ 模型选择门禁（前置条件）：首次生图 / 首次出片前必须先确认
+    p = sub.add_parser('models', help='首次生图/出片前确认模型：本地ComfyUI / RunningHub / 闭源模型')
+    ms = p.add_subparsers(dest='models_cmd')
+    q = ms.add_parser('list', help='打印可选模型清单')
+    q.set_defaults(fn=cmd_models)
+    q = ms.add_parser('status', help='查看当前确认状态（只读）')
+    q.add_argument('--json', action='store_true')
+    q.set_defaults(fn=cmd_models)
+    q = ms.add_parser('set', help='记录确认：set image=local_comfyui [video=runninghub]')
+    q.add_argument('pairs', nargs='+', metavar='kind=choice')
+    q.add_argument('--detail', default=None)
+    q.set_defaults(fn=cmd_models)
+    q = ms.add_parser('reset', help='清除某类确认（换模型前用）')
+    q.add_argument('kind', choices=('image', 'video'))
+    q.set_defaults(fn=cmd_models)
+    q = ms.add_parser('ask', help='交互式引导确认（需 TTY）')
+    q.add_argument('kind', nargs='?', default='image', choices=('image', 'video'))
+    q.set_defaults(fn=cmd_models)
+    p.set_defaults(fn=cmd_models, models_cmd=None)
 
     pv = sub.add_parser('video', help='出片')
     vs = pv.add_subparsers(dest='vcmd')

@@ -4,6 +4,7 @@
 - 收编方式：**拷贝固化**（副本为唯一运行真源，原 Skill 包不再承担引擎职责）
 - 2026-10-08 更新：按新宗旨（让所有人都可以做AI短剧，每个人都可以把自己的故事拍出来！！！）决策移除免费通道（rh-free-h3-video），出片仅保留「AI 应用 + 工作流」标准通道
 - **2026-10-10 更新**：新增**本地 ComfyUI 资产出图通道**（收编自 WorkBuddy Skill `comfyui-local-imagegen`），资产出图改为**默认本地（￥0）**、云端计费通道并存；同时修复两处收编遗留缺陷（`drama.py` 的脚本路径与工作区下传）
+- **2026-10-12 更新**：①新增**模型选择门禁**（前置条件）：首次生图/出片前必须确认模型（本地 ComfyUI / RunningHub / 闭源模型），确认单落 `<工作区>/model-plan.json`，未确认即拦（退出码 4）；②新增**西语 AI 漫剧创作链路** `stages/creation/`，按交付**四部分**组织：① 榜单调研与对比（多市场 + 西语重点）→ ② 爆款拆解（题材/套路/爆点/偏好/差异化趋势）→ ③ 选题定位（受众画像/题材方向/差异化卖点）→ ④ 剧本改写（源剧本 → N 集规划，默认 60 集，每集冲突/反转/钩子），并打通与 `tools/cli.py` 及 `drama.py` 的对接
 - 完整性校验：`manifest.sha256`（每文件 SHA-256，可用 `Get-FileHash` / `sha256sum -c` 核对）
 - 依赖锁定：`requirements.txt`（httpx==0.28.1 / Pillow==12.2.0，实测 Python 3.13）
 
@@ -19,6 +20,8 @@
 | `stages/assets/comfyui/` | WorkBuddy Skill `comfyui-local-imagegen` | **2026-10-10 收编** | **本地出图引擎**：`comfy_client.py`（纯标准库、零第三方依赖、不出网）+ `workflow_qwen_image21.json` 示例工作流 + references（出图流程 / 节点表与换工作流适配） |
 | `stages/assets/scripts/asset_md.py` | 新增（补断点：创作产物 → 引擎输入） | **v1.0.0（2026-10-10）** | 资产提示词 md → 本地 ComfyUI 清单（纯标准库）；配套 19 例离线测试 |
 | `stages/production/scripts/gen_assets_local.py` | 新增（薄桥） | **v1.0.0（2026-10-10）** | 生产总控侧本地出图桥：md → 清单 → 调本地引擎 → 产物清单 + 零成本台账 |
+| `stages/production/scripts/model_gate.py` | 新增（前置条件门禁） | **v1.0.0（2026-10-12）** | 首次生图/出片前的模型选择确认（本地 ComfyUI / RunningHub / 闭源模型）；配套 19 例离线测试 |
+| `stages/creation/` | 新增（西语漫剧创作链路·四部分） | **v1.0.0（2026-10-12）** | ① 榜单调研与对比（`market_data.py`）→ ② 爆款拆解（`hit_breakdown.py`）→ ③ 选题定位（`topic_analysis.py` + `hit_selection.py`）→ ④ 剧本改写（`script_rewrite.py`）；纯标准库；配套 49 例离线测试 |
 | `tools/` | 项目工具链 `D:\AI-Drama\parallel-me\tools` | 2026-09 版 | 创作层确定性工具：init / import-bible / parse / check / convert / reindex / report / set-anchor / gen(stub) |
 | `docs/creation/` | WorkBuddy Skill `ai-drama-creator` references | 2026-09 版 | 创作层方法论：FFS 规范 / 转换规则 / QA 门 / STYLE LOCK 预设 / 流水线落盘规范 |
 
@@ -63,6 +66,21 @@
 
 **行为不变性说明**：所有改动不触碰提交/轮询/下载/对齐/渲染/计费守卫等任何业务逻辑；在原环境设置相同环境变量时行为与源版本一致；未设环境变量时按仓库内缺省或显式报错（不再静默指向个人机器路径）。
 
+### 2026-10-12 新增（模型门禁 + 西语漫剧创作链路）
+
+| 文件 | 改动 | 原因 |
+|---|---|---|
+| `stages/production/scripts/model_gate.py` | **新增**（纯标准库）。生图/视频模型的「首次执行前确认」门禁：可选清单、菜单/确认请求渲染、`status/list/set/reset/ask/require` 子命令、`gate_state`/`require` 判定（含通道一致性校验）、退出码 4 | **新增前置条件**：首次生图/出片前必须确认模型，未确认不得执行 |
+| `stages/production/scripts/drama.py` | ①新增 `models` 子命令（转发 model_gate）；②`cmd_assets`（local 与 rh 两路）在 `--submit` 前、`cmd_video_run` 在 `--yes` 后，先查模型门禁，未过即停（`_model_gate`）；③docstring/GUIDE 同步 | 把门禁接入计费动作入口，确保「未确认不执行」 |
+| `stages/production/scripts/tests/test_model_gate.py` | **新增** 19 例离线测试（零网络零计费） | 门禁是安全边界，必须可回归 |
+| `configs/model-plan.example.json` | **新增** 模型确认单模板（含规则、可选值、闭源模型说明） | 配置单点、可留档 |
+| `stages/creation/` （整目录） | **新增**（纯标准库）西语漫剧创作链路，按交付**四部分**组织：`scripts/{creation,market_data,hit_breakdown,topic_analysis,hit_selection,script_rewrite,_common}.py` + `prompts/{s0-market-research,s1-hit-breakdown,s2-topic-positioning,s3-script-rewrite}.md` + `references/{spanish-market,scoring-model,module-contracts}.md` + `assets/{market-data,creation-brief}.template.json` + `scripts/tests/test_creation_pipeline.py`（49 例）+ `README.md` | **围绕西语 AI 漫剧生产流程完善功能**：① 榜单调研与对比（多市场横向对比 + 西语重点 + 覆盖度门禁）、② 爆款拆解（题材类型/剧情套路/爆点元素/内容偏好/差异化趋势）、③ 选题定位（受众画像/题材方向/差异化卖点）、④ 剧本改写（源剧本 → N 集规划，默认 60 集，每集核心冲突/反转/钩子 + 爆点节拍），并**对接现有 agent 体系**（`tools/cli.py` 创作工具链 + `drama.py` 执行引擎） |
+| `README.md`、`VERSIONS.md`、`docs/Agent项目技术文档.md` | 新增模型门禁与创作链路的定位、命令、模块表与数据契约 | 文档同步 |
+
+> 创作层技能本体（`ai-drama-creator` / `overseas-ai-comic-script-master` / `short-drama-hit-topics` 等）
+> **仍保持 WorkBuddy 技能形态**（会话内 LLM 工作流）；本次新增的是其**确定性部分**（评分/交叉/去重/排期/
+> 结构抽取/FFS 骨架/格式自检/数据覆盖度门禁），不重复实现 LLM 创意环节。
+
 ## 三、运行时排除项（未收编）
 
 | 项 | 原因 |
@@ -94,4 +112,9 @@ python stages/assets/scripts/tests/test_asset_md.py
 # 4) 本地出图通道（零第三方依赖，不需要任何 Key；需本机 ComfyUI 在跑）
 python stages/assets/comfyui/comfy_client.py --check
 python stages/production/scripts/drama.py assets --engine local          # 干跑
+
+# 5) 模型门禁 + 创作链路（零网络零计费）
+python stages/production/scripts/tests/test_model_gate.py
+python stages/creation/scripts/tests/test_creation_pipeline.py
+python stages/creation/scripts/creation.py guide
 ```
