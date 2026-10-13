@@ -37,7 +37,7 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 | **完整性指纹** | `manifest.sha256`（114 条，显式排除自身） | ✅ 逐文件 0 不符 |
 | **设计文档** | 可行性检查报告 + 技术文档 + 创作层方法论 5 篇 + 模块 references | ✅ 已交付 |
 | **依赖锁定** | `requirements.txt`（`httpx==0.28.1` / `Pillow==12.2.0`，实测 Python 3.13） | ✅ 已交付 |
-| **开源发布** | GitHub [`Hejunlong27/Drama`](https://github.com/Hejunlong27/Drama)，Apache-2.0 | ✅ 已发布 |
+| **开源发布** | GitHub [`Hejunlong27/SoloDrama`](https://github.com/Hejunlong27/SoloDrama)，Apache-2.0 | ✅ 已发布 |
 
 ### 1.2 已交付功能矩阵
 
@@ -147,7 +147,7 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 ### 阶段 5 · 首次开源发布（10-09）
 
 `git push` 被本地代理隧道打成 502，改用 **PAT + GitHub Git Data API** 完成首次单提交快进推送。
-> 落地：`github.com/Hejunlong27/Drama`，Apache-2.0。
+> 落地：`github.com/Hejunlong27/SoloDrama`（2026-10-13 由 `Drama` 更名，旧地址自动跳转），Apache-2.0。
 
 ### 阶段 6 · 接入本地 ComfyUI 出图通道（10-10）
 
@@ -202,7 +202,7 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 
 ```text
 请帮我安装并初始化这个开源项目，我要用它制作 AI 短剧：
-https://github.com/Hejunlong27/Drama
+https://github.com/Hejunlong27/SoloDrama
 
 请依次完成，每步做完告诉我结果：
 1. 克隆到 D:\SoloDrama，安装 requirements.txt 里的依赖
