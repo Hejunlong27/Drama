@@ -38,7 +38,7 @@ import subprocess
 import sys
 import time
 
-_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]      # .../Drama-agent
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]      # .../SoloDrama
 ENGINE = _PROJECT_ROOT / 'stages' / 'video' / 'workflow' / 'scripts' / 'engine'
 COMFY_DIR = _PROJECT_ROOT / 'stages' / 'assets' / 'comfyui'
 COMFY_PY = COMFY_DIR / 'comfy_client.py'

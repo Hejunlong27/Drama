@@ -1,4 +1,4 @@
-# drama-agent：AI 短剧批量生产 Agent 项目 · 技术文档
+# SoloDrama：AI 短剧批量生产 Agent 项目 · 技术文档
 
 - 版本：v0.1（设计稿，待确认后实施）
 - 日期：2026-10-08
@@ -29,7 +29,7 @@
 ### 1.3 运行模式（混合，A1 建议）
 
 ```
-WorkBuddy 会话（人工质量闸）                 drama-agent（独立 CLI，可定时/可无人值守）
+WorkBuddy 会话（人工质量闸）                 SoloDrama（独立 CLI，可定时/可无人值守）
 ┌──────────────────────────────┐            ┌──────────────────────────────────────┐
 │ 0 选题 short-drama-hit-topics │            │ 7  资产卡净化+出图    asset-card-*    │
 │ 1 世界观+人物  ai-drama-creator│   产物落盘  │ 9  参考图接线          wire_*        │
@@ -54,8 +54,8 @@ WorkBuddy 会话（人工质量闸）                 drama-agent（独立 CLI�
 ### 2.2 项目目录结构
 
 ```
-drama-agent/
-├── drama_agent/                      # ★ 编排层（新增，薄）
+SoloDrama/
+├── solo_drama/                      # ★ 编排层（新增，薄）
 │   ├── cli.py                        # 唯一入口：drama <command>（argparse）
 │   ├── settings.py                   # 配置加载：configs/settings.json + 环境变量 + --workspace 覆盖
 │   ├── workspace.py                  # 工作区解析（--workspace > DRAMA_WORKSPACE > ./）与目录树初始化
@@ -98,12 +98,12 @@ drama-agent/
 
 | 模块 | 职责 | 来源 | 改动程度 |
 |---|---|---|---|
-| `drama_agent/cli.py` | 子命令分发、全局 `--workspace`、退出码约定 | 新增 | 🆕 |
-| `drama_agent/settings.py` | 三层配置合并（默认 < settings.json < 环境变量）；Key 一律打码展示 | 新增 | 🆕 |
-| `drama_agent/state.py` | 聚合创作层 `project.json`（state.step / ep_status）与出片层 `output/*/state.json`，生成 `progress.json`；**只读，不改源文件** | 新增 | 🆕（补 B4） |
-| `drama_agent/ledger.py` | 追加式事件日志（submit/usage/gate_confirm/error/retry…）+ 按 batch/集/段汇总；口径仍以平台 `usage` 为准 | 新增 | 🆕（补 O4） |
-| `drama_agent/gates.py` | G3/G5 计费确认、G6 汇报契约、⑦ 字幕停点问询——确认话术沿用原 Skill 模板 | 新增 | 🆕 |
-| `drama_agent/scheduler.py` | 账号→槽位建模（1 账号=5 槽）、队列派单、失败段重试上限+冷却、跨批次对账（`--batch-id`） | 新增（吸收 supervise.py 实测结论） | 🆕 |
+| `solo_drama/cli.py` | 子命令分发、全局 `--workspace`、退出码约定 | 新增 | 🆕 |
+| `solo_drama/settings.py` | 三层配置合并（默认 < settings.json < 环境变量）；Key 一律打码展示 | 新增 | 🆕 |
+| `solo_drama/state.py` | 聚合创作层 `project.json`（state.step / ep_status）与出片层 `output/*/state.json`，生成 `progress.json`；**只读，不改源文件** | 新增 | 🆕（补 B4） |
+| `solo_drama/ledger.py` | 追加式事件日志（submit/usage/gate_confirm/error/retry…）+ 按 batch/集/段汇总；口径仍以平台 `usage` 为准 | 新增 | 🆕（补 O4） |
+| `solo_drama/gates.py` | G3/G5 计费确认、G6 汇报契约、⑦ 字幕停点问询——确认话术沿用原 Skill 模板 | 新增 | 🆕 |
+| `solo_drama/scheduler.py` | 账号→槽位建模（1 账号=5 槽）、队列派单、失败段重试上限+冷却、跨批次对账（`--batch-id`） | 新增（吸收 supervise.py 实测结论） | 🆕 |
 | `stages/convert_storyboard.py` | 解析 H3 六段式提示词 md（`<Picture N>` / `<d>` / `[Shot N] At MM:SS` / 守卫表引用）→ 生成 `data/` 四文件；**只做搬运不改一字提示词** | 新增 | 🆕（补 B1） |
 | `stages/ingest_check.py` | 门禁：提示词非空、`<d>` 台词齐全、`<Picture N>` 连续且 ≤6、`duration` 与时间戳总时长一致、参考图 key 存在、守卫表覆盖全部道具 | 新增 | 🆕（补 B7） |
 | `stages/video/` | 出片引擎（并发≤5、断点续跑、熔断、probe、计费预估） | ai-video-pipeline | ✅ 原样收编 |
@@ -382,7 +382,7 @@ planned → scripted(创作层) → ingested(门禁过) → converted(data/ 就�
 
 ### 6.4 新增接口约定
 
-**统一通道适配器**（`drama_agent/adapters/channel_rh.py`，单实现可扩展——后续新引擎按同签名接入）：
+**统一通道适配器**（`solo_drama/adapters/channel_rh.py`，单实现可扩展——后续新引擎按同签名接入）：
 
 ```
 doctor()      -> {ok, checks[], next_action}          # 零网络/零计费
@@ -510,7 +510,7 @@ drama run-episode --workspace "D:/剧/新剧A" --ep 3
 | `stages/refs/` | short-drama-production | `<Picture N>` 落位规则、体检项（悬空槽/超 6 槽）、成本口径（≈145/段，保守 210）、清.tmp 纪律 |
 | `stages/subtitle/` | drama-subtitle-pipeline | 先放大后烧录、跑完即停、七道断言、安全区（≥200px / ≤70% 宽）、zh/es 分派 |
 | `stages/qa/` | short-drama-production | 像素验收判定标准、已验证/未验证边界表述 |
-| `drama_agent/`（新增） | — | 只做编排/校验/记账；不重写引擎、不改任何源 schema |
+| `solo_drama/`（新增） | — | 只做编排/校验/记账；不重写引擎、不改任何源 schema |
 
 ## 附录 B：实施顺序（确认 A1–A8 后）
 

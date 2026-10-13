@@ -45,7 +45,7 @@ import re
 import sys
 import time
 
-_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../Drama-agent
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 ENGINE = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
                       or _PROJECT_ROOT / 'stages' / 'video' / 'workflow') / 'scripts' / 'engine'
 sys.path.insert(0, str(ENGINE))

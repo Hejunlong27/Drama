@@ -41,7 +41,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import _common as C  # noqa: E402
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../Drama-agent
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 
 BRIEF_TEMPLATE = {

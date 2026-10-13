@@ -1,4 +1,6 @@
-# Drama-agent
+# SoloDrama
+
+**一个人，就是一个剧组。**
 
 > **宗旨：一个人、一天时间、一台电脑、N部短剧！！！**
 >
@@ -203,7 +205,7 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 https://github.com/Hejunlong27/Drama
 
 请依次完成，每步做完告诉我结果：
-1. 克隆到 D:\Drama-agent，安装 requirements.txt 里的依赖
+1. 克隆到 D:\SoloDrama，安装 requirements.txt 里的依赖
 2. 跑一遍离线自检，确认 131 例用例全绿（这一步不联网、不花钱）
 3. 检查本机有没有装 ComfyUI；没装就告诉我怎么装，装好后帮我在项目里配置好
 4. 检查 RunningHub 的 API Key 是否已配置成环境变量；没有就告诉我怎么申请
@@ -218,7 +220,7 @@ https://github.com/Hejunlong27/Drama
 装好之后，把这段发给它（把故事、平台、集数换成你自己的）：
 
 ```text
-用 D:\Drama-agent 帮我把下面这个故事做成一部短剧。
+用 D:\SoloDrama 帮我把下面这个故事做成一部短剧。
 
 【故事】<把你的故事或小说粘在这里>
 【平台】竖屏（TikTok / 红果风格）
@@ -346,7 +348,7 @@ python stages/creation/scripts/tests/test_creation_pipeline.py
 ## 目录结构
 
 ```
-Drama-agent/
+SoloDrama/
 ├── stages/
 │   ├── creation/          ★ 西语漫剧创作链路（① 调研对比 → ② 爆款拆解 → ③ 选题定位 → ④ 剧本改写）
 │   ├── video/workflow/    批量出片引擎（RunningHub 工作流 / AI 应用）

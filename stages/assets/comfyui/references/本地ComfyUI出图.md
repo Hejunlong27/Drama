@@ -8,7 +8,7 @@
 
 ---
 
-## 一、在 Drama-agent 里的位置
+## 一、在 SoloDrama 里的位置
 
 本通道是**资产出图的第三条路**，与前两条**并存**，由 `drama.py assets --engine` 切换：
 

@@ -59,7 +59,7 @@ VP = WS / 'video-pipeline'
 #   如需复刻旧布局，用环境变量 DRAMA_SCRIPTS_DIR 覆盖。
 SCRIPTS = pathlib.Path(os.environ.get('DRAMA_SCRIPTS_DIR')
                        or pathlib.Path(__file__).resolve().parent)
-_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../Drama-agent
+_PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 SKILL = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
                      or _PROJECT_ROOT / 'stages' / 'video' / 'workflow')
 RUN_PY = SKILL / 'scripts' / 'run.py'
