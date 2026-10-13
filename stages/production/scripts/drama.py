@@ -56,8 +56,9 @@ VP = WS / 'video-pipeline'
 # ★ 2026-10-10 修复：收编进本仓库后，生产脚本不再住在 <工作区>/scripts/，而是**与本文件同目录**
 #   （`stages/production/scripts/`）。原先的 `WS / 'scripts'` 是上游项目布局的残留，
 #   会让 rh_doctor / cost_ledger / gen_char_assets / gen_scene_assets / gen_assets_local 全部找不到。
-#   如需复刻旧布局，用环境变量 DRAMA_SCRIPTS_DIR 覆盖。
-SCRIPTS = pathlib.Path(os.environ.get('DRAMA_SCRIPTS_DIR')
+#   如需复刻旧布局，用环境变量 SOLODRAMA_SCRIPTS_DIR（旧名 DRAMA_SCRIPTS_DIR 仍兼容）覆盖。
+SCRIPTS = pathlib.Path(os.environ.get('SOLODRAMA_SCRIPTS_DIR')
+                       or os.environ.get('DRAMA_SCRIPTS_DIR')
                        or pathlib.Path(__file__).resolve().parent)
 _PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 SKILL = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
@@ -104,15 +105,19 @@ def _harden_stdio() -> None:
 
 def hydrate_env() -> None:
     # ★ 进程环境里缺的，从「用户级环境变量」补（agent 的 shell 常拿不到）：
-    #   前三个是云端通道用的 Key；DRAMA_ASSET_MD 是「资产提示词 md」真源，**本地通道也要用**。
-    want = ('RUNNINGHUB_API_KEY', 'RUNNINGHUB_ENT_API_KEY', 'RUNNINGHUB_BASE_URL', 'DRAMA_ASSET_MD')
+    #   前三个是云端通道用的 Key；SOLODRAMA_ASSET_MD 是「资产提示词 md」真源，**本地通道也要用**。
+    #   ★ 2026-10-13 改名过渡：新旧两个名字都参与补全，子脚本按「新名优先、旧名回退」读取。
+    want = ('RUNNINGHUB_API_KEY', 'RUNNINGHUB_ENT_API_KEY', 'RUNNINGHUB_BASE_URL',
+            'SOLODRAMA_ASSET_MD', 'DRAMA_ASSET_MD')
     os.environ.setdefault('PYTHONUTF8', '1')
     os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
     os.environ['VIDEO_PIPELINE_WORKSPACE'] = str(VP)
     # ★ 2026-10-10：把已解析出的工作区**下传给子进程**。子脚本（gen_*_assets / cost_ledger /
     #   rh_doctor / gen_assets_local …）都靠 `_ws.resolve()` 定位工作区，而它们自己无法从
     #   脚本位置推断出来（脚本住在仓库里，不在工作区里）—— 不传就会全部报「找不到短剧工作区」。
-    os.environ.setdefault('DRAMA_WORKSPACE', str(WS))
+    #   ★ 两个名字都下发：子脚本读新名，外部工具/用户脚本若仍读旧名也不会失灵。
+    os.environ.setdefault('SOLODRAMA_WORKSPACE', str(WS))
+    os.environ.setdefault('SOLODRAMA_WORKSPACE', str(WS))
     missing = [n for n in want if not os.environ.get(n)]
     if not missing or os.name != 'nt':
         return

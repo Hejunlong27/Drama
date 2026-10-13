@@ -58,7 +58,7 @@ SoloDrama/
 ├── solo_drama/                      # ★ 编排层（新增，薄）
 │   ├── cli.py                        # 唯一入口：drama <command>（argparse）
 │   ├── settings.py                   # 配置加载：configs/settings.json + 环境变量 + --workspace 覆盖
-│   ├── workspace.py                  # 工作区解析（--workspace > DRAMA_WORKSPACE > ./）与目录树初始化
+│   ├── workspace.py                  # 工作区解析（--workspace > SOLODRAMA_WORKSPACE > ./）与目录树初始化
 │   ├── state.py                      # 编排状态视图：只读聚合 project.json / output/*/state.json → progress.json
 │   ├── ledger.py                     # 统一台账：ledger.jsonl（追加式事件）+ cost 汇总
 │   ├── gates.py                      # 关卡确认点：计费双确认、字幕停点（免费步骤默认、计费必确认）
@@ -223,7 +223,7 @@ WorkBuddy 创作会话
 |---|---|---|
 | `RUNNINGHUB_API_KEY` / `RUNNINGHUB_API_KEY_2` | 出图/收费通道 | 消费级；**AI 应用通道禁止用企业级 Key** |
 | `RUNNINGHUB_ENT_API_KEY` | 标准模型 API（如场景空镜文生图） | 企业级-共享 |
-| `DRAMA_WORKSPACE` | 建议 | 默认工作区（`--workspace` 参数优先） |
+| `SOLODRAMA_WORKSPACE` | 建议 | 默认工作区（`--workspace` 参数优先） |
 | `PYTHONUTF8=1` | 必须 | 中文文本处理（对齐器硬要求） |
 | `TVAI_MODEL_DIR` / `TVAI_MODEL_DATA_DIR` | 放大时 | Topaz 模型定位（可写进 configs/upscale.json 兜底） |
 | `AI_VIDEO_PIPELINE_SKILL` | 收编后不再需要 | 引擎已在项目内，路径由 settings.json 提供 |
@@ -480,7 +480,7 @@ drama run-episode --workspace "D:/剧/新剧A" --ep 3
 | 放大报 `Model not found: prob-4` | Topaz 模型目录未定位 | upscale.py 自动探测；探测不到写进 `config.upscale.json` |
 | 放大后画质没变 | 退化为纯插值 | 看 `<ep>_upscale.json` 的 `sharpness_gain_hf`/`engine` 字段，自检会判失败 |
 | 跑到一半显存爆/黑帧 | 并行多集或显存被占 | 一次一集；`"vram": 0.8` |
-| 找不到工作区 | 未传 `--workspace` 且无 `DRAMA_WORKSPACE` | 两者给其一；解析链 `--workspace > 环境变量 > ./` |
+| 找不到工作区 | 未传 `--workspace` 且无 `SOLODRAMA_WORKSPACE` | 两者给其一；解析链 `--workspace > 环境变量 > ./` |
 | 转换器报「字段缺失」 | 提示词 md 不符合内嵌约定 | 按第 6.2 节补齐标签；**转换器不猜不编** |
 
 ---

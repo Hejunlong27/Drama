@@ -23,7 +23,7 @@ import sys
 from PIL import Image, ImageChops
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # noqa: E402
-from _ws import WS as _WS_ROOT  # noqa: E402  ★ 工作区解析（env DRAMA_WORKSPACE > 位置推断 > 报错）
+from _ws import WS as _WS_ROOT  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错）
 WS = str(_WS_ROOT)
 SUBS = os.path.join(WS, "video-pipeline", "output", "subs")
 SAMPLES = 5          # 每条字幕取几帧求交集

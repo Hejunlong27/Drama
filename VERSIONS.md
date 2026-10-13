@@ -5,6 +5,7 @@
 - 2026-10-08 更新：按新宗旨（让所有人都可以做AI短剧，每个人都可以把自己的故事拍出来！！！）决策移除免费通道（rh-free-h3-video），出片仅保留「AI 应用 + 工作流」标准通道
 - **2026-10-10 更新**：新增**本地 ComfyUI 资产出图通道**（收编自 WorkBuddy Skill `comfyui-local-imagegen`），资产出图改为**默认本地（￥0）**、云端计费通道并存；同时修复两处收编遗留缺陷（`drama.py` 的脚本路径与工作区下传）
 - **2026-10-12 更新**：①新增**模型选择门禁**（前置条件）：首次生图/出片前必须确认模型（本地 ComfyUI / RunningHub / 闭源模型），确认单落 `<工作区>/model-plan.json`，未确认即拦（退出码 4）；②新增**西语 AI 漫剧创作链路** `stages/creation/`，按交付**四部分**组织：① 榜单调研与对比（多市场 + 西语重点）→ ② 爆款拆解（题材/套路/爆点/偏好/差异化趋势）→ ③ 选题定位（受众画像/题材方向/差异化卖点）→ ④ 剧本改写（源剧本 → N 集规划，默认 60 集，每集冲突/反转/钩子），并打通与 `tools/cli.py` 及 `drama.py` 的对接
+- **2026-10-13 更新**：**项目更名为 SoloDrama**（取自「一个人，就是一个剧组」，命名格式 `<前缀>+Drama`）；README 首段补齐「创作层 + 执行层」双段式介绍与「一台家用笔记本（RTX 4060 8G + 16G 内存）即可跑通」的硬件门槛说明；**环境变量前缀由 `DRAMA_*` 迁至 `SOLODRAMA_*`**（新名优先、旧名回退，见第五节）
 - 完整性校验：`manifest.sha256`（每文件 SHA-256，可用 `Get-FileHash` / `sha256sum -c` 核对）
 - 依赖锁定：`requirements.txt`（httpx==0.28.1 / Pillow==12.2.0，实测 Python 3.13）
 
@@ -118,3 +119,25 @@ python stages/production/scripts/tests/test_model_gate.py
 python stages/creation/scripts/tests/test_creation_pipeline.py
 python stages/creation/scripts/creation.py guide
 ```
+
+## 五、环境变量前缀迁移（2026-10-13）
+
+项目更名 SoloDrama 后，自有环境变量前缀由 `DRAMA_*` 迁至 `SOLODRAMA_*`。**为不破坏已有配置，采取「新名优先、旧名回退」策略**——
+两套名字并存，读到哪个用哪个：
+
+| 用途 | 新名（推荐） | 旧名（仍兼容） |
+|---|---|---|
+| 默认工作区 | `SOLODRAMA_WORKSPACE` | `DRAMA_WORKSPACE` |
+| 资产提示词 md | `SOLODRAMA_ASSET_MD` | `DRAMA_ASSET_MD` |
+| 生产脚本目录覆盖 | `SOLODRAMA_SCRIPTS_DIR` | `DRAMA_SCRIPTS_DIR` |
+
+实现要点：
+
+- 统一读取口径：`os.environ.get("SOLODRAMA_X") or os.environ.get("DRAMA_X")`，共 10 处读取点；
+- `stages/production/scripts/_ws.py` 新增 `env_workspace()` 与 `ENV_NAMES`，作为工作区解析的唯一入口；
+- `drama.py hydrate_env()` 会**同时下发**新旧两个工作区变量，因此外部工具或用户自写脚本读旧名也不会失灵；
+- 用户级环境变量补全（winreg）同时认这两个名字。
+
+> 未迁移的变量（刻意保留原名）：`RUNNINGHUB_*` / `RH_*` / `COMFYUI_*` / `VIDEO_PIPELINE_WORKSPACE` / `TVAI_*`
+> —— 前四类属平台或引擎既有契约，改名会破坏兼容；`VIDEO_PIPELINE_WORKSPACE` 由引擎自带，不属于本项目自有前缀。
+

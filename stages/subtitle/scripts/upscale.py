@@ -55,12 +55,12 @@ import time
 _HINT = (
     "找不到短剧工作区。请二选一：\n"
     "  ① 命令行加 --workspace \"<项目根目录>\"\n"
-    "  ② 设环境变量：$env:DRAMA_WORKSPACE = \"<项目根目录>\"  （PowerShell）\n"
+    "  ② 设环境变量：$env:SOLODRAMA_WORKSPACE = \"<项目根目录>\"  （PowerShell）\n"
     "工作区的标志物是 <项目根>/video-pipeline/data/。")
 
 
 def resolve_ws():
-    """工作区解析：`_ws`（项目里有）> DRAMA_WORKSPACE > 脚本位置推断 > None。
+    """工作区解析：`_ws`（项目里有）> SOLODRAMA_WORKSPACE > 脚本位置推断 > None。
 
     ★ 为什么不能简单 `from _ws import WS`：本脚本住在 **Skill 包**里时没有 `_ws.py`
     （它属于另一个 Skill），会直接 ModuleNotFoundError —— 而且 `_ws` 在解析不到工作区时
@@ -76,7 +76,7 @@ def resolve_ws():
         return str(_WS), ""
     except BaseException:
         pass
-    env = os.environ.get("DRAMA_WORKSPACE")
+    env = (os.environ.get("SOLODRAMA_WORKSPACE") or os.environ.get("DRAMA_WORKSPACE"))
     if env and os.path.isdir(env):
         return os.path.abspath(env), ""
     cand = os.path.dirname(d)
@@ -864,7 +864,7 @@ def main():
     harden_stdio()
     ap = argparse.ArgumentParser(description="高清放大（Topaz Video 本地 AI 超分）")
     ap.add_argument("--ep", required=True, help="集号，如 ep03")
-    ap.add_argument("--workspace", default=None, help="项目根目录；也可用 DRAMA_WORKSPACE")
+    ap.add_argument("--workspace", default=None, help="项目根目录；也可用 SOLODRAMA_WORKSPACE")
     ap.add_argument("--config", default=None, help="自定义配置文件路径")
     ap.add_argument("--target", default=None, help="覆盖目标分辨率，如 2560x1440 或 3840x2160")
     ap.add_argument("--factor", type=float, default=None, help="按倍数放大，如 2")

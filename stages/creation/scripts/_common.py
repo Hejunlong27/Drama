@@ -94,24 +94,24 @@ def read_text(p) -> str:
 
 
 def resolve_ws(explicit=None) -> pathlib.Path:
-    """工作区解析：`--workspace > DRAMA_WORKSPACE > 项目标志物推断`（与 _ws.py 同口径）。"""
+    """工作区解析：`--workspace > SOLODRAMA_WORKSPACE > 项目标志物推断`（与 _ws.py 同口径）。"""
     if explicit:
         p = pathlib.Path(explicit).expanduser()
         if p.is_dir():
             return p.resolve()
         sys.exit("[FAIL] --workspace 指向的目录不存在：%s" % p)
-    env = os.environ.get("DRAMA_WORKSPACE")
+    env = (os.environ.get("SOLODRAMA_WORKSPACE") or os.environ.get("DRAMA_WORKSPACE"))
     if env:
         p = pathlib.Path(env).expanduser()
         if p.is_dir():
             return p.resolve()
-        sys.exit("[FAIL] 环境变量 DRAMA_WORKSPACE 指向的目录不存在：%s" % env)
+        sys.exit("[FAIL] 环境变量 SOLODRAMA_WORKSPACE 指向的目录不存在：%s" % env)
     # 脚本住在仓库里：向上找带 project.json / video-pipeline 的目录
     here = pathlib.Path(__file__).resolve()
     for parent in here.parents:
         if (parent / "project.json").is_file() or (parent / "video-pipeline").is_dir():
             return parent
-    sys.exit("[FAIL] 找不到工作区。请用 --workspace 或环境变量 DRAMA_WORKSPACE 指定。")
+    sys.exit("[FAIL] 找不到工作区。请用 --workspace 或环境变量 SOLODRAMA_WORKSPACE 指定。")
 
 
 def pdir(ws, rel: str) -> pathlib.Path:

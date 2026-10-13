@@ -31,7 +31,7 @@ from PIL import Image
 sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # noqa: E402
-from _ws import WS  # noqa: E402  ★ 工作区解析（env DRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
+from _ws import WS  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
 VP = WS / "video-pipeline"
 DATA = VP / "data"
 OUT = VP / "output" / "assets"

@@ -370,7 +370,8 @@ SoloDrama/
   - `RUNNINGHUB_API_KEY`（消费级；工作流 / AI 应用通道）
   - `RUNNINGHUB_ENT_API_KEY`（企业级-共享；仅标准模型 API 使用，如场景空镜文生图）
   - `RUNNINGHUB_BASE_URL`（站点，按账号所在站设置）
-  - `DRAMA_WORKSPACE`（默认工作区）、`DRAMA_ASSET_MD`（资产提示词 md）
+  - `SOLODRAMA_WORKSPACE`（默认工作区）、`SOLODRAMA_ASSET_MD`（资产提示词 md）
+    > 旧前缀 `DRAMA_WORKSPACE` / `DRAMA_ASSET_MD` / `DRAMA_SCRIPTS_DIR` **仍然生效**（新名优先、旧名回退），已有配置无需改动。
   - `RH_CHAR_APP_ID` / `RH_SCENE_APP_ID`（账号绑定的 AI 应用 ID）
   - `COMFYUI_URL`（本地 ComfyUI 地址，默认 `http://127.0.0.1:8188`）
 - 运行配置唯一可写文件是 `<工作区>/config.local.json`（模板：`stages/video/workflow/assets/config.local.example.json`）。

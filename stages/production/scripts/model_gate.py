@@ -132,23 +132,23 @@ def _harden_stdio() -> None:
 # 工作区与确认单读写
 # ---------------------------------------------------------------------------
 def _resolve_ws(explicit: str | None = None) -> pathlib.Path:
-    """按 `--workspace > DRAMA_WORKSPACE > 脚本位置推断` 解析工作区（与 _ws.py 同口径，但不退出）。"""
+    """按 `--workspace > SOLODRAMA_WORKSPACE > 脚本位置推断` 解析工作区（与 _ws.py 同口径，但不退出）。"""
     if explicit:
         p = pathlib.Path(explicit).expanduser()
         if p.is_dir():
             return p.resolve()
         sys.exit("[FAIL] --workspace 指向的目录不存在：%s" % p)
-    env = os.environ.get("DRAMA_WORKSPACE")
+    env = (os.environ.get("SOLODRAMA_WORKSPACE") or os.environ.get("DRAMA_WORKSPACE"))
     if env:
         p = pathlib.Path(env).expanduser()
         if p.is_dir():
             return p.resolve()
-        sys.exit("[FAIL] 环境变量 DRAMA_WORKSPACE 指向的目录不存在：%s" % p)
+        sys.exit("[FAIL] 环境变量 SOLODRAMA_WORKSPACE 指向的目录不存在：%s" % p)
     # 脚本位置推断：<ws>/scripts/model_gate.py （收编后脚本住在仓库里，故一般靠前两条）
     cand = pathlib.Path(__file__).resolve().parent.parent
     if (cand / "video-pipeline").is_dir() or (cand / "model-plan.json").is_file():
         return cand
-    sys.exit("[FAIL] 找不到工作区。请用 --workspace 或环境变量 DRAMA_WORKSPACE 指定。")
+    sys.exit("[FAIL] 找不到工作区。请用 --workspace 或环境变量 SOLODRAMA_WORKSPACE 指定。")
 
 
 def plan_path(ws: pathlib.Path) -> pathlib.Path:
@@ -403,7 +403,7 @@ def cmd_require(a) -> int:
 def main() -> int:
     _harden_stdio()
     ap = argparse.ArgumentParser(description="生图/视频模型「首次执行前确认」门禁")
-    ap.add_argument("--workspace", default=None, help="工作区（默认 DRAMA_WORKSPACE）")
+    ap.add_argument("--workspace", default=None, help="工作区（默认 SOLODRAMA_WORKSPACE）")
     sub = ap.add_subparsers(dest="cmd")
 
     p = sub.add_parser("list", help="打印可选模型清单")

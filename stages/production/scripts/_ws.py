@@ -12,7 +12,7 @@
 
 解析优先级（高 → 低）：
     1. 函数参数 `explicit`（命令行 `--workspace` 传进来的值）
-    2. 环境变量 `DRAMA_WORKSPACE`      ← 换项目/从 Skill 调用时用这个
+    2. 环境变量 `SOLODRAMA_WORKSPACE`（旧名 `DRAMA_WORKSPACE` 仍兼容）  ← 换项目/从 Skill 调用时用这个
     3. 脚本位置推断：`<项目>/scripts/xxx.py` ⇒ `<项目>`
     4. 报错并给出**可照抄的修法**（不静默猜路径）
 
@@ -32,7 +32,19 @@ MARKERS = (
     Path("video-pipeline") / "data",
 )
 
-ENV_NAME = "DRAMA_WORKSPACE"
+# ★ 2026-10-13 项目改名为 SoloDrama：环境变量新名 SOLODRAMA_* 优先，旧名 DRAMA_* 继续兼容（过渡期）。
+ENV_NAME = "SOLODRAMA_WORKSPACE"
+ENV_LEGACY = "DRAMA_WORKSPACE"
+ENV_NAMES = (ENV_NAME, ENV_LEGACY)
+
+
+def env_workspace():
+    """读工作区环境变量：`SOLODRAMA_WORKSPACE` 优先，回退旧名 `DRAMA_WORKSPACE`。"""
+    for n in ENV_NAMES:
+        v = os.environ.get(n)
+        if v:
+            return v
+    return None
 
 _HINT = (
     "[FAIL] 找不到短剧工作区。\n"
@@ -58,7 +70,7 @@ def resolve(explicit=None) -> Path:
             return p.resolve()
         sys.exit("[FAIL] --workspace 指向的目录不存在：%s" % p)
     # ② 环境变量
-    env = os.environ.get(ENV_NAME)
+    env = env_workspace()
     if env:
         p = Path(env).expanduser()
         if p.is_dir():
@@ -80,7 +92,7 @@ def resolve_lenient(explicit=None):
     if explicit:
         p = Path(explicit).expanduser()
         return p.resolve() if p.is_dir() else None
-    env = os.environ.get(ENV_NAME)
+    env = env_workspace()
     if env:
         p = Path(env).expanduser()
         if p.is_dir():

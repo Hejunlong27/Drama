@@ -14,7 +14,7 @@
 
 本脚本做什么（薄桥，不做重活）
 ------------------------------
-1. 读 `DRAMA_ASSET_MD` 指向的「资产提示词 md」（**与云端两脚本同一真源**）；
+1. 读 `SOLODRAMA_ASSET_MD` 指向的「资产提示词 md」（**与云端两脚本同一真源**）；
 2. 调 `stages/assets/scripts/asset_md.py` 转成 ComfyUI 清单 `comfyui_manifest.json`；
 3. 调 `stages/assets/comfyui/comfy_client.py` 出图到 `<工作区>/video-pipeline/output/assets/`；
 4. 汇总产物写 `comfyui_assets_manifest.json`，并按**统一台账口径**补记 `ledger/runs/`（route=local、消耗为 0）。
@@ -60,9 +60,9 @@ except Exception:                                                 # noqa: BLE001
     pass
 
 VP = WS / 'video-pipeline'
-_MD_ENV = (os.environ.get('DRAMA_ASSET_MD') or '').strip()
+_MD_ENV = ((os.environ.get('SOLODRAMA_ASSET_MD') or os.environ.get('DRAMA_ASSET_MD')) or '').strip()
 if not _MD_ENV:
-    raise SystemExit('[FAIL] 未设置环境变量 DRAMA_ASSET_MD'
+    raise SystemExit('[FAIL] 未设置环境变量 SOLODRAMA_ASSET_MD'
                      '（指向「资产提示词 md」：角色/场景/道具提示词真源）')
 ASSET_MD = pathlib.Path(_MD_ENV)
 

@@ -26,10 +26,10 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # noqa: E402
-from _ws import WS  # noqa: E402  ★ 工作区解析（env DRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
+from _ws import WS  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
 VP = WS / "video-pipeline"
 DATA = VP / "data"
-ASSET_MD = Path(os.environ.get("DRAMA_ASSET_MD") or "")   # 资产提示词 md（可选：缺省时跳过资产核对）
+ASSET_MD = Path((os.environ.get("SOLODRAMA_ASSET_MD") or os.environ.get("DRAMA_ASSET_MD")) or "")   # 资产提示词 md（可选：缺省时跳过资产核对）
 
 RH_PER_SEG = 180          # 第三集 13 段实测口径（均值 175，留余量）
 CNY_PER_RH = 0.0025       # 1 RH币 ≈ ¥0.0025（用户 2026-09-18）；2026-09-19 用户补：1 美元 = 2746 RH币

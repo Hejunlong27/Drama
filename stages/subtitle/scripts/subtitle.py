@@ -47,16 +47,16 @@ import time
 # ---------------------------------------------------------------- 基础设施
 
 def default_workspace():
-    """默认工作区解析：环境变量 DRAMA_WORKSPACE > 脚本位置推断 > None。
+    """默认工作区解析：环境变量 SOLODRAMA_WORKSPACE > 脚本位置推断 > None。
 
     为什么不能只靠 `__file__` 推断：本脚本住在 **Skill 包**里时，推出来的是 Skill 目录，
     不是用户项目 —— 会报「找不到配置 <skill>/video-pipeline/config.subtitle.json」。
-    ⇒ 调用方用 `--workspace "<项目根>"` 或设 `DRAMA_WORKSPACE` 指过去。
+    ⇒ 调用方用 `--workspace "<项目根>"` 或设 `SOLODRAMA_WORKSPACE` 指过去。
 
     刻意**不在 import 期退出**（否则连 `--help` 都跑不了）：解析不到返回 None，
     由 main() 给出可照抄的报错。
     """
-    env = os.environ.get("DRAMA_WORKSPACE")
+    env = (os.environ.get("SOLODRAMA_WORKSPACE") or os.environ.get("DRAMA_WORKSPACE"))
     if env and os.path.isdir(env):
         return os.path.abspath(env)
     cand = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1208,7 +1208,7 @@ def main():
     ap = argparse.ArgumentParser(description="可复用字幕管线（对齐 → ASS → 母版 → 烧录）")
     ap.add_argument("--ep", required=True, help="集号，如 ep03")
     ap.add_argument("--workspace", default=ROOT,
-                    help="项目根目录；也可用环境变量 DRAMA_WORKSPACE 指定")
+                    help="项目根目录；也可用环境变量 SOLODRAMA_WORKSPACE 指定")
     ap.add_argument("--stage", default="all",
                     choices=["align", "cues", "ass", "master", "upscale", "render", "all"])
     ap.add_argument("--preview", type=int, default=0, metavar="N",
@@ -1227,7 +1227,7 @@ def main():
         raise SystemExit(
             "找不到短剧工作区。请二选一：\n"
             "  ① --workspace \"<项目根目录>\"\n"
-            "  ② 设环境变量：$env:DRAMA_WORKSPACE = \"<项目根目录>\"  （PowerShell）\n"
+            "  ② 设环境变量：$env:SOLODRAMA_WORKSPACE = \"<项目根目录>\"  （PowerShell）\n"
             "工作区的标志物是 <项目根>/video-pipeline/data/ 与 config.subtitle.json。")
     ws = os.path.abspath(args.workspace)
     cfg = load_config(ws)

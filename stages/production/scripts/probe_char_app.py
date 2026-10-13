@@ -35,8 +35,8 @@ os.environ.setdefault('PYTHONUTF8', '1')
 import config as C                                        # noqa: E402
 from runninghub_client import RunningHubClient, RunningHubError   # noqa: E402
 
-# 输出快照目录：优先 DRAMA_WORKSPACE，回退当前目录 ./docs
-WS = pathlib.Path(os.environ.get('DRAMA_WORKSPACE') or pathlib.Path.cwd())
+# 输出快照目录：优先 SOLODRAMA_WORKSPACE，回退当前目录 ./docs
+WS = pathlib.Path((os.environ.get('SOLODRAMA_WORKSPACE') or os.environ.get('DRAMA_WORKSPACE')) or pathlib.Path.cwd())
 
 # 探测目标 AI 应用 id：账号绑定资源，从环境变量注入
 DEFAULT_APP = os.environ.get('RH_CHAR_APP_ID', '')

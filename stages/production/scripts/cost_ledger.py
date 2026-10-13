@@ -38,7 +38,7 @@ from datetime import datetime
 # 常量
 # --------------------------------------------------------------------------
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # noqa: E402
-from _ws import WS  # noqa: E402  ★ 工作区解析（env DRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
+from _ws import WS  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
 VP = WS / 'video-pipeline'
 DATA = VP / 'data'
 AUTO_RUNS = VP / 'ledger' / 'runs'

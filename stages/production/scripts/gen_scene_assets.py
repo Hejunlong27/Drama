@@ -26,7 +26,7 @@
 
 提示词真源
 ----------
-`DRAMA_ASSET_MD` 环境变量指向的「资产提示词 md」（每部剧一份）
+`SOLODRAMA_ASSET_MD` 环境变量指向的「资产提示词 md」（每部剧一份）
 「二、场景资产」下每个 `## 场景 N · 名称…` 一节 = 一个场景（含胶片/摄影风格标注），节内 ``` 块 = 提示词。
 场景 1（金碧辉煌酒楼大包厢）已有成图（= `characters.json` 的 `scene_01`，2560×1440，即梦出品）；
 缺口 = 场景 2-7，与 `config.assets.json` 的 missing_assets.scenes（S2-S7）一一对应。
@@ -50,7 +50,7 @@ _PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 ENGINE = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
                       or _PROJECT_ROOT / 'stages' / 'video' / 'workflow') / 'scripts' / 'engine'
 sys.path.insert(0, str(ENGINE))
-# ★ 工作区解析（env DRAMA_WORKSPACE > 脚本位置推断 > 报错）；用 append 以免抢在 ENGINE 之前
+# ★ 工作区解析（env SOLODRAMA_WORKSPACE > 脚本位置推断 > 报错）；用 append 以免抢在 ENGINE 之前
 sys.path.append(str(pathlib.Path(__file__).resolve().parent))
 os.environ.setdefault('PYTHONUTF8', '1')
 
@@ -60,9 +60,9 @@ from run_ledger import RunLedger                                      # noqa: E4
 
 from _ws import WS                                                    # noqa: E402
 VP = WS / 'video-pipeline'
-ASSET_MD = pathlib.Path(os.environ.get('DRAMA_ASSET_MD') or '')
+ASSET_MD = pathlib.Path((os.environ.get('SOLODRAMA_ASSET_MD') or os.environ.get('DRAMA_ASSET_MD')) or '')
 if not str(ASSET_MD):
-    raise SystemExit('[FAIL] 未设置环境变量 DRAMA_ASSET_MD（指向「资产提示词 md」：按项目组织的角色/场景提示词真源）')
+    raise SystemExit('[FAIL] 未设置环境变量 SOLODRAMA_ASSET_MD（指向「资产提示词 md」：按项目组织的角色/场景提示词真源）')
 
 OUT_DIR = VP / 'output' / 'assets' / 'scenes'
 MANIFEST = VP / 'data' / 'scene_assets_manifest.json'

@@ -1,6 +1,6 @@
 import json, os, pathlib
 
-ws = pathlib.Path(os.environ.get('DRAMA_WORKSPACE') or r'<你的工作区>\video-pipeline')
+ws = pathlib.Path((os.environ.get('SOLODRAMA_WORKSPACE') or os.environ.get('DRAMA_WORKSPACE')) or r'<你的工作区>\video-pipeline')
 shots = json.loads((ws / 'data' / 'shots.json').read_text(encoding='utf-8'))
 h3 = json.loads((ws / 'data' / 'h3_prompts.json').read_text(encoding='utf-8'))
 chars = json.loads((ws / 'data' / 'characters.json').read_text(encoding='utf-8'))

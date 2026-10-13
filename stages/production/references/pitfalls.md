@@ -7,8 +7,8 @@
 | 现象 | 根因 | 修法 |
 |---|---|---|
 | `[FAIL] 未设置 RUNNINGHUB_API_KEY`（明明配过） | agent 的 shell **继承不到用户级环境变量**（`setx` 写的是 `HKCU\Environment`） | **走 `drama.py`**（内部 `hydrate_env()` 用 `winreg` 补齐）；不要直接跑 `gen_*_assets.py` |
-| `找不到短剧工作区` | 没设 `DRAMA_WORKSPACE`，且脚本不在 `<WS>/scripts/` 下 | 设环境变量或用 `--workspace` |
-| `subtitle.py` 报「找不到配置 `<skill>/video-pipeline/config.subtitle.json`」 | 引擎住在 Skill 包里，`__file__` 推出的是 Skill 目录 | 加 `--workspace "<WS>"` 或设 `DRAMA_WORKSPACE` |
+| `找不到短剧工作区` | 没设 `SOLODRAMA_WORKSPACE`，且脚本不在 `<WS>/scripts/` 下 | 设环境变量或用 `--workspace` |
+| `subtitle.py` 报「找不到配置 `<skill>/video-pipeline/config.subtitle.json`」 | 引擎住在 Skill 包里，`__file__` 推出的是 Skill 目录 | 加 `--workspace "<WS>"` 或设 `SOLODRAMA_WORKSPACE` |
 | 上传接口报 `code=1 API Key不存在`（但 Key 是对的） | **站点用错**：上传接口在 `.cn` 会失败，账号在 `.ai` | `config.local.json` 的 `runninghub_base_url` 必须是 `https://www.runninghub.ai` |
 | 双击 .bat 后 Python 抛 `UnicodeEncodeError` | 控制台是 GBK，打印 `[OK]`/`⇒`/`￥` 崩 | .bat 用 **GBK** 保存；脚本按 `isatty()` 分流编码 |
 | 引擎 `doctor` 报 `image_providers['banana']` FAIL | 本线走 `--video-only`，不需要图片 provider | 归为**已知噪音**，不算真问题 |
