@@ -20,10 +20,20 @@ output/
 **/ledger/
 orchestrator/
 
-# 例外：引擎自带的 workspace 模板样例必须入库
+# ---- 例外：引擎自带的 workspace 模板样例必须入库（逐文件白名单）----
+# ⚠ 安全红线：此处**不得**使用 `data/**` 通配放开。
+#   该目录位于 assets/ 下，若整体放开会绕过上方 `data/`、`**/data/refs/`、
+#   `**/data/*manifest*.json`、`**/config.local.json` 等全部忽略规则，
+#   将来一旦被放入真实资产 / 真实 webappId / 含 Key 的配置，会被静默提交并公开。
+#   因此：目录先放开以便 git 进入，内部除下列样例外的任何文件一律不跟踪。
 !stages/video/workflow/assets/workspace-template/
 !stages/video/workflow/assets/workspace-template/data/
-!stages/video/workflow/assets/workspace-template/data/**
+stages/video/workflow/assets/workspace-template/data/*
+!stages/video/workflow/assets/workspace-template/data/README.md
+!stages/video/workflow/assets/workspace-template/data/characters.json
+!stages/video/workflow/assets/workspace-template/data/scenes.json
+!stages/video/workflow/assets/workspace-template/data/shots.json
+!stages/video/workflow/assets/workspace-template/data/h3_prompts.json
 
 # ---- 运行时残留 ----
 __pycache__/
