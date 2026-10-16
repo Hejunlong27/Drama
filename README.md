@@ -1,6 +1,6 @@
 # SoloDrama
 
-**一个人，就是一个剧组。** 
+**一个人，就是一个剧组。**
 
 > **宗旨：一个人、一天时间、一台电脑、N部短剧！！！**
 >
@@ -171,6 +171,21 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 
 ## 四、怎么用
 
+> **统一入口（2026-10-16 起）**：本项目现在是短剧生产的**单一编排层** ——
+> 此前分散在多个 WorkBuddy Skill 里的流程、规则与门禁，已收敛为「一份总纲 + 一套预置脚本 + 一个 CLI」。
+> 全流程、目录规范与硬规则见 **[`docs/orchestration/生产流程总纲.md`](docs/orchestration/生产流程总纲.md)**（单一真源）。
+>
+> **开跑前必须先过通道确认门禁**（每次任务开始前）：
+>
+> ```powershell
+> python stages/production/scripts/drama.py models status   # 看生图/视频通道与「执行依据」是否齐备
+> python stages/production/scripts/drama.py models set image=local_comfyui video=runninghub --workflow-id <ID>
+> ```
+>
+> 通道四选一：**本地 ComfyUI（￥0）/ 云端 ComfyUI / RunningHub AI 应用 / 闭源模型**。
+> 选了**云端 ComfyUI** 必须同时提供**服务地址 + 工作流 API 文件**；选了 **RH AI 应用**必须提供**应用地址**；
+> 缺依据即停在关卡（退出码 4），不许开工。
+
 先分清你是哪一类 —— 两条路线的入口、前置与产出完全不同：
 
 | | **使用者**（内容创作者 / 短剧团队） | **开发者**（改造引擎 / 接新通道 / 做集成） |
@@ -264,6 +279,18 @@ python stages/production/scripts/drama.py models set image=local_comfyui video=r
 # ---- 每集循环：顺序执行；带 ★ 的会花钱，都需要你显式确认 ----
 python stages/production/scripts/drama.py status          # 先看全盘状态（零网络）
 
+# ⓪ 通道确认（★ 首次必做；每次任务开始前先看一遍）
+python stages/production/scripts/drama.py models status
+python stages/production/scripts/drama.py models set image=<local_comfyui|cloud_comfyui|runninghub|closed_source> \
+        video=<local_comfyui|cloud_comfyui|runninghub|runninghub_ai_app|closed_source> \
+        [--comfy-url ...] [--comfy-workflow <导出的工作流API.json>] [--app-url ...] [--workflow-id ...]
+
+# ⓪.5 分镜/提示词 → data/ 四文件 + 入门口禁（零费用，把错误挡在计费之前）
+python stages/production/scripts/convert_storyboard.py --workspace <工作区> --ep ep01            # 干跑
+python stages/production/scripts/convert_storyboard.py --workspace <工作区> --ep ep01 --apply    # 真写
+python stages/production/scripts/ingest_check.py      --workspace <工作区> --ep ep01
+python stages/production/scripts/script_timing_check.py --workspace <工作区> --ep ep01          # 台词时长审计（4.2 字/秒）
+
 # ① 资产出图（★ 默认本地 ComfyUI，￥0，只花本机电与时间）
 python stages/production/scripts/drama.py assets --engine local --check    # 体检 ComfyUI 是否在线
 python stages/production/scripts/drama.py assets --engine local            # 干跑：只看清单，不出图
@@ -287,9 +314,11 @@ python stages/subtitle/scripts/subtitle.py --workspace <工作区> --ep ep03
 python stages/subtitle/scripts/subtitle.py --workspace <工作区> --ep ep03 --burn   # 一口气完成
 python stages/subtitle/scripts/subtitle.py --workspace <工作区> --ep ep03 --preview 2   # 只出 2 段预览
 
-# ⑤ 验收 + 结账
+# ⑤ 验收 + 结账 + 发布前合规
 python stages/production/scripts/drama.py report
 python stages/production/scripts/drama.py cost --checkpoint                # 收工结账，记基线
+python stages/production/scripts/compliance_precheck.py --workspace <工作区> --ep ep01 --q1 no --q2 no --q3 no
+python stages/production/scripts/compliance_precheck.py --workspace <工作区> --all --aigc-label yes --restricted 0 --total 30
 ```
 
 > 出片缺图 / 提示词有缺陷时，`preflight` 与干跑会先拦下来 —— 把错误挡在计费之前。
@@ -388,6 +417,10 @@ SoloDrama/
 
 | 主题 | 文档 |
 |---|---|
+| **生产流程总纲（流程 · 目录规范 · 硬规则 · 门禁）★ 单一真源** | `docs/orchestration/生产流程总纲.md` |
+| **技能映射、缺口台账与重叠裁决** | `docs/orchestration/技能映射与缺口.md` |
+| **发布前合规预检清单（TikTok 口径）** | `docs/compliance/发布前合规预检清单.md` |
+| **台词时长审计口径（4.2 字/秒）** | `docs/creation/台词时长审计口径.md` |
 | 改造背景、可行性分析 | `docs/可行性检查报告.md` |
 | 架构、数据契约、执行流程 | `docs/Agent项目技术文档.md` |
 | **西语漫剧创作链路（四部分）** | `stages/creation/README.md` |

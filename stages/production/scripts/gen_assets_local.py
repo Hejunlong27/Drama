@@ -51,7 +51,7 @@ os.environ.setdefault('PYTHONUTF8', '1')
 
 from run_ledger import RunLedger            # noqa: E402
 import asset_md as AM                       # noqa: E402
-from _ws import WS                          # noqa: E402
+from _ws import WS, DATA, OUT as OUT_ROOT    # noqa: E402  ★ 分阶段目录真源
 
 try:                                        # Windows 控制台 GBK → UTF-8
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')    # type: ignore[union-attr]
@@ -59,16 +59,16 @@ try:                                        # Windows 控制台 GBK → UTF-8
 except Exception:                                                 # noqa: BLE001
     pass
 
-VP = WS / 'video-pipeline'
+VP = WS / 'video-pipeline'   # 引擎技术目录
 _MD_ENV = ((os.environ.get('SOLODRAMA_ASSET_MD') or os.environ.get('DRAMA_ASSET_MD')) or '').strip()
 if not _MD_ENV:
     raise SystemExit('[FAIL] 未设置环境变量 SOLODRAMA_ASSET_MD'
                      '（指向「资产提示词 md」：角色/场景/道具提示词真源）')
 ASSET_MD = pathlib.Path(_MD_ENV)
 
-MANIFEST = VP / 'data' / 'comfyui_manifest.json'
-PROD_MANIFEST = VP / 'data' / 'comfyui_assets_manifest.json'
-OUT_DIR = VP / 'output' / 'assets'
+MANIFEST = DATA / 'comfyui_manifest.json'
+PROD_MANIFEST = DATA / 'comfyui_assets_manifest.json'
+OUT_DIR = OUT_ROOT / 'assets'
 BATCH_ID = 'local_assets_' + time.strftime('%Y%m%d_%H%M%S')
 
 SUBDIR = {'char': 'characters', 'scene': 'scenes', 'prop': 'props'}

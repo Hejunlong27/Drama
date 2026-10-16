@@ -41,8 +41,15 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import _common as C  # noqa: E402
 
+try:                                          # 分阶段目录真源（stages/_layout.py）
+    import _layout as L  # noqa: E402
+except Exception:                             # noqa: BLE001
+    L = None
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 SCRIPTS = pathlib.Path(__file__).resolve().parent
+
+DEFAULT_EPISODES = 30      # ★ 2026-10-16 用户拍板：默认集数由 60 降为 30（提升单集留存率与投入产出比）
 
 BRIEF_TEMPLATE = {
     "slug": "<英文短名>", "title": "<中文剧名>",
@@ -51,7 +58,7 @@ BRIEF_TEMPLATE = {
     "audience": "<拉美女性 18-40>",
     "genre_directions": ["<女频逆袭>", "<狼人奇幻>"],
     "budget_tier": "<低|中|高>",
-    "ep_total": 60, "ep_seconds": 90,
+    "ep_total": DEFAULT_EPISODES, "ep_seconds": 90,
     "style_hint": "<可选：色卡/基调偏好>",
     "notes": "<其他约束，如：源剧本很颠，保留其核心爽点>",
 }
@@ -75,6 +82,16 @@ def _py() -> str:
     return sys.executable or "python"
 
 
+def _rel_disp(ws, rel: str) -> str:
+    """把历史相对路径显示成**实际落点**（新布局下让用户一眼看到文件到底在哪）。"""
+    if L is None:
+        return rel
+    try:
+        return L.stage_rel(ws, rel)
+    except Exception:      # noqa: BLE001
+        return rel
+
+
 # ---------------------------------------------------------------------------
 def cmd_scaffold(a) -> int:
     explicit = getattr(a, "workspace", None)
@@ -86,17 +103,24 @@ def cmd_scaffold(a) -> int:
     print(C.hr())
     print("  工作区：%s" % ws)
 
-    # 1) 数据契约骨架（引擎侧约定：<ws>/video-pipeline）
-    for d in ("video-pipeline/data", "video-pipeline/output", "video-pipeline/ledger"):
-        (ws / d).mkdir(parents=True, exist_ok=True)
+    # 1) 分阶段目录骨架（唯一真源 stages/_layout.py；无 layout.json 时建旧结构）
+    if L is not None:
+        info = L.scaffold(ws)
+        print("  分阶段目录：")
+        for k, d in L.all_stage_dirs(ws).items():
+            print("    %-11s %s" % (k, d.name))
+        print("  布局声明  ：%s" % info["layout_file"])
+    else:
+        for d in ("video-pipeline/data", "video-pipeline/output", "video-pipeline/ledger"):
+            (ws / d).mkdir(parents=True, exist_ok=True)
 
-    # 2) 创作层目录 + brief
-    for d in (C.MARKET_DIR, C.BREAKDOWN_DIR, C.POSITIONING_DIR, C.SCRIPT_DIR):
-        (ws / d).mkdir(parents=True, exist_ok=True)
+    # 2) 创作层目录 + brief（相对路径写法不变，由 _common.pdir 改写落点）
+    for rel in (C.MARKET_DIR, C.BREAKDOWN_DIR, C.POSITIONING_DIR, C.SCRIPT_DIR):
+        C.pdir(ws, rel).mkdir(parents=True, exist_ok=True)
     brief = dict(BRIEF_TEMPLATE)
     brief.update({"slug": a.slug, "title": a.title, "platform": a.platform,
                   "ep_total": a.ep, "ep_seconds": a.sec})
-    brief_path = C.write_json(ws / C.BRIEF, brief)
+    brief_path = C.write_json(C.pdir(ws, C.BRIEF), brief)
     print("  [OK] 创作 brief：%s" % brief_path)
 
     # 3) 收编创作层工具链 tools/（项目自带一份，与内容解耦）
@@ -124,17 +148,19 @@ def cmd_scaffold(a) -> int:
         print("  [WARN] 未找到 tools/cli.py，project.json 未生成")
 
     # 5) 市场数据模板
-    C.write_text(ws / C.MARKET_FILE, json.dumps(_market_template_json(), ensure_ascii=False, indent=2))
-    print("\n  [OK] 市场数据模板：%s" % (ws / C.MARKET_FILE))
+    mk = C.pdir(ws, C.MARKET_FILE)
+    C.write_text(mk, json.dumps(_market_template_json(), ensure_ascii=False, indent=2))
+    print("\n  [OK] 市场数据模板：%s" % mk)
 
     print("\n" + "-" * 74)
     print("四部分流程（顺序执行）：")
-    print("  0) 确认模型（前置条件）：python stages/production/scripts/drama.py models --ask")
+    print("  0) 确认通道（前置条件，**每次任务开始前必须先确认**）：")
+    print("       本地/云端 ComfyUI 还是 RH AI 应用 → python stages/production/scripts/drama.py models --ask")
     print("  ① 榜单调研与对比：creation.py market queries → 检索 → 回填 → market check / market compare")
     print("  ② 爆款拆解      ：creation.py breakdown analyze")
     print("  ③ 选题定位      ：creation.py topic scaffold（填 brief 与候选）→ topic score → hit select --top 3")
-    print("  ④ 剧本改写      ：把源剧本放到 creation/03-script/source-script.md")
-    print("                    → creation.py script plan --episodes 60 → build --ep 1 --emit → lint --ep 1")
+    print("  ④ 剧本改写      ：把源剧本放到 %s" % _rel_disp(ws, C.SOURCE_SCRIPT))
+    print("                    → creation.py script plan --episodes %d → build --ep 1 --emit → lint --ep 1" % DEFAULT_EPISODES)
     return 0
 
 
@@ -151,30 +177,30 @@ def cmd_status(a) -> int:
     print(C.hr())
     print("  工作区：%s" % ws)
     for label, rel in STEPS:
-        p = ws / rel
-        print("  %-16s %s  %s" % (label, "[就绪]" if p.is_file() else "[缺失]", rel))
+        p = C.pdir(ws, rel)
+        print("  %-16s %s  %s" % (label, "[就绪]" if p.is_file() else "[缺失]", _rel_disp(ws, rel)))
     mg = ws / "model-plan.json"
     print("  %-16s %s  model-plan.json" % ("模型门禁", "[已确认]" if mg.is_file() else "[未确认]"))
-    src = ws / C.SOURCE_SCRIPT
-    print("  %-16s %s  %s" % ("源剧本(很颠)", "[已放]" if src.is_file() else "[未放]", C.SOURCE_SCRIPT))
+    src = C.pdir(ws, C.SOURCE_SCRIPT)
+    print("  %-16s %s  %s" % ("源剧本(很颠)", "[已放]" if src.is_file() else "[未放]", _rel_disp(ws, C.SOURCE_SCRIPT)))
     # 关键计数
-    md = C.read_json(ws / C.MARKET_FILE) or {}
+    md = C.read_json(C.pdir(ws, C.MARKET_FILE)) or {}
     if md:
         print("\n  ① 市场数据：对标剧 %d / 榜单 %d / 市场 %d / 趋势 %d"
               % (len(md.get("hits") or []), len(md.get("rankings") or []),
                  len(md.get("markets") or []), len(md.get("trends") or [])))
-    bd = C.read_json(ws / C.BREAKDOWN) or {}
+    bd = C.read_json(C.pdir(ws, C.BREAKDOWN)) or {}
     if bd:
         print("  ② 拆解    ：题材 %d 类 / 套路 %d 类 / 爆点 %d 类 / 差异化趋势 %d 条"
               % (len(bd.get("genre_distribution") or []), len(bd.get("tropes") or []),
                  len(bd.get("boom_elements") or []), len(bd.get("differentiation_trends") or [])))
-    cand = C.read_json(ws / C.CANDIDATES) or {}
+    cand = C.read_json(C.pdir(ws, C.CANDIDATES)) or {}
     if cand:
         print("  ③ 候选池  ：%s" % json.dumps(cand.get("counts", {}), ensure_ascii=False))
-    sel = C.read_json(ws / C.POSITIONING) or {}
+    sel = C.read_json(C.pdir(ws, C.POSITIONING)) or {}
     if sel:
         print("  ③ 定位卡  ：%s" % "、".join(x.get("title", "?") for x in sel.get("selected", [])))
-    bp = C.read_json(ws / C.BLUEPRINT) or {}
+    bp = C.read_json(C.pdir(ws, C.BLUEPRINT)) or {}
     if bp:
         print("  ④ 集数规划：%d 集（源剧本 %s）"
               % (bp.get("total_ep", 0), "已登记" if (bp.get("source_script") or {}).get("present") else "未提供"))
@@ -214,7 +240,8 @@ def main() -> int:
     p.add_argument("--slug", required=True)
     p.add_argument("--title", required=True)
     p.add_argument("--platform", default="ReelShort")
-    p.add_argument("--ep", type=int, default=60, help="总集数（④剧本改写规划用，默认 60）")
+    p.add_argument("--ep", type=int, default=DEFAULT_EPISODES,
+                   help="总集数（④剧本改写规划用，默认 %d —— 2026-10-16 由 60 下调）" % DEFAULT_EPISODES)
     p.add_argument("--sec", type=int, default=90)
     p.add_argument("--style-lock", default=None)
     p.set_defaults(fn=cmd_scaffold)

@@ -51,7 +51,21 @@ import sys
 # ---------------------------------------------------------------------------
 # 可选模型清单（唯一真源；改这里即改所有下游菜单与校验）
 # ---------------------------------------------------------------------------
-GATE_VERSION = 1
+GATE_VERSION = 2
+
+# 每个选项的 `requires`：必须随确认一起提供的**执行依据**。
+#   key       存进 model-plan.json 的 models.<kind>.detail[key]
+#   label     给人看的说明
+#   kind      'file' = 必须是存在的文件路径；'text' = 非空文本（地址/ID）
+# 为什么强制：只确认「用云端 ComfyUI」而不给工作流 API 文件 = 跑不起来；
+# 只确认「用 RH AI 应用」而不给应用地址 = 不知道该提交到哪。这两类信息只能由用户提供。
+REQUIRES = {
+    "comfy_workflow": {"label": "ComfyUI 工作流 API 文件（在 ComfyUI 里「导出（API）」得到的 json）", "kind": "file"},
+    "comfy_url":      {"label": "ComfyUI 服务地址（如 http://127.0.0.1:8188 或云端 https://...）", "kind": "text"},
+    "app_url":        {"label": "RunningHub AI 应用地址（应用页 URL，或 webappId）", "kind": "text"},
+    "app_id":         {"label": "RunningHub AI 应用 ID（webappId）", "kind": "text"},
+    "workflow_id":    {"label": "RunningHub 工作流 ID（workflowId）", "kind": "text"},
+}
 
 MODEL_OPTIONS = {
     "image": [
@@ -59,8 +73,19 @@ MODEL_OPTIONS = {
             "id": "local_comfyui",
             "label": "本地 ComfyUI（￥0）",
             "cost": "￥0（占本机 GPU/电费）",
-            "desc": "本机 ComfyUI 出图（默认工作流 Qwen-Image 2.1）；数据不出局域网，零计费。",
+            "desc": "本机 ComfyUI 出图；数据不出局域网、零计费。未给工作流文件时用仓库默认 Qwen-Image 2.1 工作流。",
             "engine_arg": "local",
+            "requires": [],
+            "optional": ["comfy_workflow"],
+        },
+        {
+            "id": "cloud_comfyui",
+            "label": "云端 ComfyUI（★计费/自建）",
+            "cost": "按云主机/平台计费（自建或租用）",
+            "desc": "把工作流提交到**云端** ComfyUI 服务（自建 GPU 主机或云 ComfyUI 平台）。",
+            "engine_arg": "cloud",
+            "requires": ["comfy_url", "comfy_workflow"],
+            "optional": [],
         },
         {
             "id": "runninghub",
@@ -68,6 +93,8 @@ MODEL_OPTIONS = {
             "cost": "人物约 17-27 RH币/张；场景约 $0.01/张",
             "desc": "调用 RunningHub 上的 AI 应用出定妆板/场景空镜；需消费级 Key，云端计费。",
             "engine_arg": "rh",
+            "requires": ["app_url"],
+            "optional": ["app_id"],
         },
         {
             "id": "closed_source",
@@ -76,6 +103,8 @@ MODEL_OPTIONS = {
             "desc": "可灵/即梦/Midjourney/Nano Banana(Gemini) 等；本仓库不直连，"
                     "由人工在各平台出图后落盘到工作区，引擎按本地文件接管。",
             "engine_arg": None,
+            "requires": [],
+            "optional": [],
         },
     ],
     "video": [
@@ -85,13 +114,35 @@ MODEL_OPTIONS = {
             "cost": "￥0（占本机 GPU/电费）",
             "desc": "本机 ComfyUI 跑视频工作流（如 Wan / Hunyuan 等本地视频模型）；零计费、数据不出网。",
             "engine_arg": None,
+            "requires": ["comfy_workflow"],
+            "optional": ["comfy_url"],
+        },
+        {
+            "id": "cloud_comfyui",
+            "label": "云端 ComfyUI（★计费/自建）",
+            "cost": "按云主机/平台计费（自建或租用）",
+            "desc": "把视频工作流提交到云端 ComfyUI 服务；适合本机显存不够或散热吃紧。",
+            "engine_arg": None,
+            "requires": ["comfy_url", "comfy_workflow"],
+            "optional": [],
         },
         {
             "id": "runninghub",
             "label": "RunningHub 工作流（★计费）",
             "cost": "约 78-209 RH币/段（按帧数）",
-            "desc": "RunningHub 标准通道工作流出片（九宫格→裁剪→H3 视频）；云端计费。",
+            "desc": "RunningHub 标准通道工作流出片（九宫格→裁剪→H3 视频）；云端计费，单账号并发 ≤5。",
             "engine_arg": "workflow",
+            "requires": ["workflow_id"],
+            "optional": [],
+        },
+        {
+            "id": "runninghub_ai_app",
+            "label": "RunningHub AI 应用（★计费）",
+            "cost": "按应用定价（通常与工作流同档）",
+            "desc": "把我方提供的提示词/参考图提交到 RunningHub 上的 **AI 应用** 出片（无需自建工作流）。",
+            "engine_arg": "workflow",
+            "requires": ["app_url"],
+            "optional": ["app_id"],
         },
         {
             "id": "closed_source",
@@ -99,6 +150,8 @@ MODEL_OPTIONS = {
             "cost": "按各家订阅/点数计费（站外）",
             "desc": "可灵/Veo/Sora/即梦/Runway 等；本仓库不直连，人工在各平台出片后落盘，引擎按本地文件接管。",
             "engine_arg": None,
+            "requires": [],
+            "optional": [],
         },
     ],
 }
@@ -187,6 +240,28 @@ def _find_option(kind: str, choice: str) -> dict | None:
     return None
 
 
+def missing_evidence(kind: str, choice: str, detail: dict | None) -> list:
+    """返回「执行依据」里还缺哪些（空列表 = 齐备）。
+
+    为什么要它（2026-10-16 用户要求）：
+      只确认「用云端 ComfyUI」而不给**工作流 API 文件** = 跑到一半才发现没法提交；
+      只确认「用 RH AI 应用」而不给**应用地址** = 不知道该把任务提交到哪。
+      这两类依据只能在任务开始前由用户提供 ⇒ 缺了就不放行（退出码 4）。
+    """
+    opt = _find_option(kind, choice) or {}
+    detail = detail or {}
+    miss = []
+    for key in (opt.get("requires") or []):
+        v = str(detail.get(key) or "").strip()
+        if not v:
+            miss.append(key)
+            continue
+        spec = REQUIRES.get(key) or {}
+        if spec.get("kind") == "file" and not pathlib.Path(v).expanduser().is_file():
+            miss.append(key + "（路径不存在：%s）" % v)
+    return miss
+
+
 # ---------------------------------------------------------------------------
 # 门禁查询（给 drama.py 用）
 # ---------------------------------------------------------------------------
@@ -204,6 +279,7 @@ def require(ws: pathlib.Path, kind: str, expected_engine: str | None = None) -> 
     """门禁判定。返回 (是否放行, 提示语)。
 
     * 未确认 → 不放行（提示如何确认）；
+    * 已确认但**执行依据缺失**（comfy 工作流文件 / comfy 地址 / RH 应用地址或工作流 ID）→ 不放行；
     * 已确认但命令行通道与确认不符 → 不放行（防止「确认一套、跑另一套」）。
     """
     st = gate_state(ws, kind)
@@ -211,12 +287,23 @@ def require(ws: pathlib.Path, kind: str, expected_engine: str | None = None) -> 
         return False, st["reason"]
     choice = st["choice"]
     opt = _find_option(kind, choice) or {}
+    plan = load_plan(ws)
+    detail = ((plan.get("models") or {}).get(kind) or {}).get("detail") or {}
+
+    miss = missing_evidence(kind, choice, detail)
+    if miss:
+        lines = ["本项目已确认%s模型为「%s」，但**执行依据不全**，无法开工：" % (KINDS[kind], opt.get("label", choice))]
+        for k in miss:
+            lines.append("        - %s：%s" % (k, (REQUIRES.get(k.split("（")[0]) or {}).get("label", "")))
+        lines.append("        补齐后重跑同一条确认命令即可（附 --comfy-workflow / --comfy-url / --app-url 等参数）。")
+        return False, "\n".join(lines)
+
     # 通道一致性校验：仅当本次调用能确定「实际用的通道」时才比对
     if expected_engine is not None and opt.get("engine_arg") is not None:
         if expected_engine != opt["engine_arg"]:
             return False, (
                 "本项目已确认的%s模型是「%s」（对应通道 %s），但本次执行用的是 %s。\n"
-                "        如确需改用另一条通道，请先重新确认：drama models --set %s=<choice>"
+                "        如确需改用另一条通道，请先重新确认：drama models set %s=<choice>"
                 % (KINDS[kind], opt.get("label", choice), opt.get("engine_arg"),
                    expected_engine, kind)
             )
@@ -231,6 +318,10 @@ def render_menu(kind: str, indent: str = "    ") -> str:
     for i, o in enumerate(MODEL_OPTIONS[kind], 1):
         lines.append("%s%d) %-26s %s" % (indent, i, o["label"], o["cost"]))
         lines.append("%s    %s" % (indent, o["desc"]))
+        req = o.get("requires") or []
+        if req:
+            need = "；".join((REQUIRES.get(k) or {}).get("label", k) for k in req)
+            lines.append("%s    ★ 需同时提供：%s" % (indent, need))
     return "\n".join(lines)
 
 
@@ -273,10 +364,15 @@ def cmd_status(a) -> int:
         m = (plan.get("models") or {}).get(kind) or {}
         if st["confirmed"]:
             opt = _find_option(kind, st["choice"]) or {}
-            print("%-9s : [已确认] %s（%s）  于 %s"
-                  % (KINDS[kind], opt.get("label", st["choice"]), st["choice"], m.get("confirmed_at", "-")))
+            miss = missing_evidence(kind, st["choice"], (m.get("detail") or {}))
+            flag = "[已确认]" if not miss else "[依据不全]"
+            print("%-9s : %s %s（%s）  于 %s"
+                  % (KINDS[kind], flag, opt.get("label", st["choice"]), st["choice"],
+                     m.get("confirmed_at", "-")))
             if m.get("detail"):
-                print("            detail: %s" % json.dumps(m["detail"], ensure_ascii=False))
+                print("            执行依据: %s" % json.dumps(m["detail"], ensure_ascii=False))
+            if miss:
+                print("            仍缺（补齐后才能开工）: %s" % "；".join(miss))
         else:
             print("%-9s : [未确认] 首次%s前需确认" % (KINDS[kind], KINDS[kind]))
     if getattr(a, "json", False):
@@ -295,17 +391,28 @@ def _do_set(ws: pathlib.Path, kind: str, choice: str, detail: dict | None,
         valid = "|".join(o["id"] for o in MODEL_OPTIONS[kind])
         print("[FAIL] 未知选项：%s（应为 %s）" % (choice, valid))
         return 2
+    detail = dict(detail or {})
+
+    # ★ 把 detail 里的相对路径按「工作区」解析，落盘时统一存绝对路径（避免换机器/换 cwd 漂移）
+    for k in ("comfy_workflow",):
+        v = str(detail.get(k) or "").strip()
+        if v and not pathlib.Path(v).is_absolute():
+            detail[k] = str((ws / v).resolve())
+
     plan = load_plan(ws)
     prev = (plan.get("models") or {}).get(kind)
+    miss = missing_evidence(kind, choice, detail)
     plan.setdefault("models", {})[kind] = {
         "choice": choice,
         "label": opt["label"],
         "cost": opt["cost"],
         "engine_arg": opt["engine_arg"],
         "confirmed": True,
+        "evidence_ok": not miss,
+        "missing_evidence": miss,
         "confirmed_at": _now(),
         "confirmed_by": source,
-        "detail": detail or {},
+        "detail": detail,
     }
     if prev:
         plan.setdefault("history", []).append({"at": _now(), "kind": kind,
@@ -313,6 +420,24 @@ def _do_set(ws: pathlib.Path, kind: str, choice: str, detail: dict | None,
     p = save_plan(ws, plan)
     print("[OK] 已确认 %s模型 = %s（%s）" % (KINDS[kind], opt["label"], choice))
     print("     确认单：%s" % p)
+    if detail:
+        print("     执行依据：%s" % json.dumps(detail, ensure_ascii=False))
+    if miss:
+        print()
+        print("[BLOCK] 执行依据不全，暂停在该关卡（退出码 %d）：" % EXIT_WAIT_CONFIRM)
+        for k in miss:
+            key = k.split("（")[0]
+            print("        - %s：%s" % (k, (REQUIRES.get(key) or {}).get("label", "")))
+        print("        补齐后重跑同一条命令，例如：")
+        if kind == "image" and choice == "cloud_comfyui":
+            print("          drama.py models set image=cloud_comfyui "
+                  "--comfy-url https://... --comfy-workflow \"D:/workflows/出图.json\"")
+        elif choice in ("runninghub", "runninghub_ai_app"):
+            print("          drama.py models set %s=%s --app-url \"https://www.runninghub.ai/ai-app/xxxx\""
+                  % (kind, choice))
+        else:
+            print("          drama.py models set %s=%s --comfy-workflow \"D:/workflows/xxx.json\"" % (kind, choice))
+        return EXIT_WAIT_CONFIRM
     return 0
 
 
@@ -333,13 +458,21 @@ def cmd_set(a) -> int:
                 if "=" in kv:
                     k, v = kv.split("=", 1)
                     detail[k.strip()] = v.strip()
+    # ★ 执行依据（2026-10-16）：显式参数优先于 --detail
+    for flag, key in (("comfy_url", "comfy_url"), ("comfy_workflow", "comfy_workflow"),
+                      ("app_url", "app_url"), ("app_id", "app_id"),
+                      ("workflow_id", "workflow_id")):
+        v = getattr(a, flag, None)
+        if v:
+            detail[key] = str(v).strip()
     rc = 0
     for item in a.pairs:
         if "=" not in item:
             print("[FAIL] 参数格式应为 kind=choice：%s" % item)
             return 2
         kind, choice = item.split("=", 1)
-        rc |= _do_set(ws, kind.strip(), choice.strip(), detail)
+        r = _do_set(ws, kind.strip(), choice.strip(), detail)
+        rc = rc or (r if r != 0 else 0)
     return rc
 
 
@@ -383,7 +516,18 @@ def cmd_ask(a) -> int:
             chosen = opts[int(raw) - 1]
             confirm = input("确认选用「%s」？（y/N）：" % chosen["label"]).strip().lower()
             if confirm in ("y", "yes"):
-                return _do_set(ws, kind, chosen["id"], {}, source="interactive")
+                detail = {}
+                for key in (chosen.get("requires") or []):
+                    spec = REQUIRES.get(key) or {}
+                    v = input("  请提供 %s：\n    > " % spec.get("label", key)).strip().strip('"')
+                    if v:
+                        detail[key] = v
+                for key in (chosen.get("optional") or []):
+                    spec = REQUIRES.get(key) or {}
+                    v = input("  （可选）%s，直接回车跳过：\n    > " % spec.get("label", key)).strip().strip('"')
+                    if v:
+                        detail[key] = v
+                return _do_set(ws, kind, chosen["id"], detail, source="interactive")
             print("已取消本次选择，请重新输入。")
             continue
         print("输入无效，请重试。")
@@ -416,6 +560,17 @@ def main() -> int:
     p = sub.add_parser("set", help="记录确认：set image=local_comfyui [video=runninghub]")
     p.add_argument("pairs", nargs="+", metavar="kind=choice")
     p.add_argument("--detail", default=None, help="附加说明（k=v,k2=v2 或 JSON）")
+    # ★ 执行依据（2026-10-16）：选了通道就必须给出「跑得起来」的依据
+    p.add_argument("--comfy-url", dest="comfy_url", default=None,
+                   help="ComfyUI 服务地址（本地/云端）")
+    p.add_argument("--comfy-workflow", dest="comfy_workflow", default=None,
+                   help="ComfyUI 工作流 API 文件路径（在 ComfyUI 里「导出（API）」得到的 json）")
+    p.add_argument("--app-url", dest="app_url", default=None,
+                   help="RunningHub AI 应用地址（应用页 URL）")
+    p.add_argument("--app-id", dest="app_id", default=None,
+                   help="RunningHub AI 应用 ID（webappId）")
+    p.add_argument("--workflow-id", dest="workflow_id", default=None,
+                   help="RunningHub 工作流 ID（workflowId）")
     p.set_defaults(fn=cmd_set)
 
     p = sub.add_parser("reset", help="清除某类确认（换模型前用）")

@@ -95,11 +95,34 @@ def main() -> int:
         rc = mg.cmd_set(_ns(workspace=str(ws), pairs=["image=nonsense"], detail=None))
         check("非法选项返回码 2", rc == 2, "rc=%s" % rc)
 
-        # 8. 选项 id 与清单一致
+        # 8. 选项 id 与清单一致（★ 2026-10-16 gate v2：加入「云端 ComfyUI」；视频再加「RH AI 应用」）
         for kind in ("image", "video"):
             ids = [o["id"] for o in mg.MODEL_OPTIONS[kind]]
-            check("%s 选项为三选一" % kind, ids == ["local_comfyui", "runninghub", "closed_source"],
+            check("%s 选项含本地/云端 ComfyUI 与 RH" % kind,
+                  ids[:2] == ["local_comfyui", "cloud_comfyui"] and "runninghub" in ids,
                   str(ids))
+            check("%s 每项都有 requires 字段" % kind,
+                  all("requires" in o for o in mg.MODEL_OPTIONS[kind]))
+
+        # 8b. ★ 执行依据门禁：Cloud ComfyUI 缺 URL / 缺工作流文件 → 必须拦下
+        for kind in ("image", "video"):
+            miss = mg.missing_evidence(kind, "cloud_comfyui", {})
+            check("%s 云端ComfyUI 缺依据被识别" % kind,
+                  set(miss) == {"comfy_url", "comfy_workflow"}, str(miss))
+            miss2 = mg.missing_evidence(kind, "cloud_comfyui",
+                                        {"comfy_url": "https://x", "comfy_workflow": str(ws / "nope.json")})
+            check("%s 不存在的 ComfyUI 工作流文件被识别" % kind,
+                  len(miss2) == 1 and "路径不存在" in miss2[0], str(miss2))
+            wf = ws / "wf.json"
+            wf.write_text("{}", encoding="utf-8")
+            check("%s 依据齐备时不报缺" % kind,
+                  mg.missing_evidence(kind, "cloud_comfyui",
+                                      {"comfy_url": "https://x", "comfy_workflow": str(wf)}) == [])
+
+        # 8c. ★ 本地 ComfyUI 不强制要工作流文件（有仓库默认工作流），但选了云端就必须给
+        check("本地ComfyUI 生图无强制依据", mg.missing_evidence("image", "local_comfyui", {}) == [])
+        check("RH AI应用 生图必须给应用地址",
+              mg.missing_evidence("image", "runninghub", {}) == ["app_url"])
 
         # 9. 渲染非空且含全部标签
         for kind in ("image", "video"):
@@ -107,7 +130,8 @@ def main() -> int:
             req = mg.render_confirm_request(kind, ws)
             check("%s 菜单含全部标签" % kind,
                   all(o["label"] in menu for o in mg.MODEL_OPTIONS[kind]))
-            check("%s 确认请求含三选项" % kind, "三选一" in req and "models" in req)
+            check("%s 确认请求含选项与命令" % kind,
+                  "请选择本项目的" in req and "models" in req)
     finally:
         shutil.rmtree(ws, ignore_errors=True)
 

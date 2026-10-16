@@ -117,7 +117,7 @@ def main() -> int:
 
         C.write_json(ws / C.BRIEF, {"slug": "t", "title": "测试剧", "platform": "ReelShort",
                                     "market": "es-LATAM", "audience": "拉美女性 18-40",
-                                    "ep_total": 60, "ep_seconds": 90, "form": "AI漫剧"})
+                                    "ep_total": 30, "ep_seconds": 90, "form": "AI漫剧"})   # ★ 2026-10-16 默认口径 60→30
 
         # ================= ① 榜单调研与对比 =================
         C.write_json(ws / C.MARKET_FILE, _mk_market(today))
@@ -207,7 +207,8 @@ def main() -> int:
         rc, out = _quiet(SR.plan, ws, 1, None, False)
         bp = C.read_json(ws / C.BLUEPRINT) or {}
         check("④ 落盘集数规划", bool(bp))
-        check("④ 规划 60 集", bp.get("total_ep") == 60 and len(bp.get("episodes", [])) == 60,
+        # ★ 2026-10-16：默认集数 60 → 30；节拍 中型每 3 / 大型每 8（与 60 集口径密度一致）
+        check("④ 规划 30 集（默认口径）", bp.get("total_ep") == 30 and len(bp.get("episodes", [])) == 30,
               "n=%s" % bp.get("total_ep"))
         ep1 = (bp.get("episodes") or [{}])[0]
         check("④ 每集含 冲突/反转/钩子/钩子类型",
@@ -216,10 +217,25 @@ def main() -> int:
         all_have = all(all(e.get(k) for k in ("core_conflict", "reversal", "hook"))
                        for e in bp.get("episodes", []))
         check("④ 全集均含三件套", all_have)
+        # ★ 留存率结构（2026-10-16）：四件套 + EP1 黄金3秒 + 三段留存
+        eps = bp.get("episodes", [])
+        check("④ 每集含留存四件套",
+              all(all(str(e.get(k) or "").strip()
+                      for k in ("cold_open", "core_conflict", "reversal", "hook")) for e in eps))
+        check("④ EP1 为黄金 3 秒", "黄金 3 秒" in str(ep1.get("cold_open") or ""),
+              str(ep1.get("cold_open"))[:40])
+        check("④ 留存三段（拉新攻坚/留存活口/转化与收束）",
+              [e.get("retention_role") for e in eps[:3]] == ["拉新攻坚"] * 3
+              and eps[3].get("retention_role") == "留存活口"
+              and eps[10].get("retention_role") == "转化与收束")
+        check("④ 留存结构声明齐备", isinstance(bp.get("retention_plan"), dict)
+              and bp["retention_plan"].get("ep1_golden_3s"))
         check("④ 源剧本已登记", (bp.get("source_script") or {}).get("present") is True)
-        check("④ 爆点节拍：大型 4 次 / 中型 8 次（60 集）",
-              bp["boom_cadence"]["big_count"] == 4 and bp["boom_cadence"]["mid_count"] == 8,
-              json.dumps(bp["boom_cadence"], ensure_ascii=False))
+        _bc = bp["boom_cadence"]
+        _mid = 30 // 3 - len([i for i in range(1, 31) if i % 3 == 0 and i % 8 == 0])
+        check("④ 爆点节拍（30 集：中型 %d / 大型 %d）" % (_mid, 30 // 8),
+              _bc["mid_count"] == _mid and _bc["big_count"] == 30 // 8,
+              json.dumps(_bc, ensure_ascii=False))
         check("④ 钩子链前 3 集", [h["type"] for h in bp["hook_chain"]] == ["身份悬念", "危机逼近", "秘密揭露"])
         check("④ 幕结构 4 幕", len(bp.get("act_structure", [])) == 4)
         check("④ STYLE LOCK 含底线", "no watermark" in (bp.get("style_lock") or ""))

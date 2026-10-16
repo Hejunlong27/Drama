@@ -64,11 +64,63 @@ STYLE_LOCKS = {
                 "detailed character design, 2.39:1 widescreen, " + BASE_LOCK,
 }
 
-DEFAULT_EPISODES = 60
+DEFAULT_EPISODES = 30        # ★ 2026-10-16 用户拍板：由 60 降为 30（前 3 集留存攻坚 + 投入产出比）
 ACT_SPLIT = [("起", 0.15), ("承", 0.45), ("转", 0.75), ("合", 1.0)]
 HOOK_TYPES = ["身份悬念", "危机逼近", "关系反转", "秘密揭露", "选择困境", "意外登场", "代价预告"]
-MID_BOOM_EVERY = 6      # 中型爆点
-BIG_BOOM_EVERY = 15     # 大型爆点
+MID_BOOM_EVERY = 3           # 中型爆点（30 集口径；60 集口径为 6，**密度保持一致**）
+BIG_BOOM_EVERY = 8           # 大型爆点（30 集口径；60 集口径为 15，**密度保持一致**）
+
+# ===========================================================================
+# ★ 留存率导向的剧本结构（2026-10-16 新增）
+# ---------------------------------------------------------------------------
+# 背景：用户实测几部剧「内容吸引度不够」—— 症状是前几集没能抓住人、每集中段平。
+# 因此本层把「留存结构」从"写作建议"升级为**可机器校验的硬结构**：
+#
+#   每集必含四件套（缺一即返工）：
+#     ① cold_open      开场钩子 —— 前 3-5 秒内出现「异常/冲突/悬念」之一
+#                       EP1 为**黄金 3 秒**：必须把全剧最高冲突前置，禁止背景铺垫开场
+#     ② core_conflict  核心冲突 —— 本集「谁 vs 谁 vs 什么」
+#     ③ reversal       一次反转 —— 且必须改变力量对比或信息格局（不能只是情绪起伏）
+#     ④ hook           集尾钩子 —— 让人必须点下一集；**类型不得与前两集连续重复**
+#
+#   留存三段（retention_role）：
+#     EP1-3   「拉新攻坚」三连强钩子链，禁止出现铺垫集、禁止慢热
+#     EP4-10  「留存活口」每集至少一次「小爽」落点，爆点密度最高
+#     EP11+   「转化与收束」按爆点节拍推进，收尾前 2 集必须再拉一次强钩子
+# ===========================================================================
+RETENTION_ROLES = [
+    (3, "拉新攻坚", "三连强钩子链；EP1 前 3 秒必须出现最高冲突，禁止背景铺垫开场"),
+    (10, "留存活口", "每集至少一次「小爽」落点；中段不得出现连续两集无爆点"),
+    (10 ** 9, "转化与收束", "按爆点节拍推进；收尾前 2 集必须再拉一次强钩子，留悬念收束"),
+]
+
+# 开场钩子（cold_open）句库：按留存段分配，保证前 3 秒有信息量
+COLD_OPEN_BANK = {
+    "拉新攻坚": [
+        "冷开场直接抛出本集最尖锐的矛盾，主角处境一句话说清",
+        "开场即冲突现场，先给结果再倒叙成因（3 秒内出画面）",
+        "开场用一句反常识台词制造认知落差",
+    ],
+    "留存活口": [
+        "开场承接上集钩子，10 秒内给出新变量",
+        "开场以对手视角开场，让观众先看到危机全貌",
+        "开场用一次小胜/小爽落点回报观众耐心",
+    ],
+    "转化与收束": [
+        "开场给出倒计时或代价预告，明确终局临近",
+        "开场回收一条早期伏笔，制造「原来如此」的满足感",
+        "开场让主角主动出击，扭转被动局面",
+    ],
+}
+
+
+def _retention_role(ep: int) -> tuple:
+    """返回 (留存段名, 段内说明)。"""
+    for upto, name, note in RETENTION_ROLES:
+        if ep <= upto:
+            return name, note
+    return RETENTION_ROLES[-1][1], RETENTION_ROLES[-1][2]
+
 
 CONFLICT_BANK = {
     "起": ["身份错位引发冲突", "至亲/资源被夺", "被误解并驱逐", "契约/误认开局"],
@@ -168,8 +220,14 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
         act = _act_of(i, n)
         hook_type = HOOK_CHAIN_FIRST3[i - 1] if i <= 3 else HOOK_TYPES[(i - 1) % len(HOOK_TYPES)]
         boom = ("big" if i % BIG_BOOM_EVERY == 0 else ("mid" if i % MID_BOOM_EVERY == 0 else "none"))
+        r_name, r_note = _retention_role(i)
+        cold = COLD_OPEN_BANK[r_name][(i - 1) % len(COLD_OPEN_BANK[r_name])]
+        if i == 1:
+            cold = "★黄金 3 秒：把全剧最高冲突前置到开场（禁止背景铺垫、禁止慢热）"
         episodes_list.append({
             "ep": i, "act": act,
+            "retention_role": r_name,
+            "cold_open": cold,
             "core_conflict": "%s：%s" % (_pick(CONFLICT_BANK[act], i), card.get("conflict") or "主线对抗"),
             "reversal": _pick(REVERSAL_BANK[act], i),
             "hook_type": hook_type,
@@ -203,6 +261,17 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
         "boom_cadence": {"mid_every": MID_BOOM_EVERY, "big_every": BIG_BOOM_EVERY,
                          "mid_count": sum(1 for e in episodes_list if e["boom"] == "mid"),
                          "big_count": sum(1 for e in episodes_list if e["boom"] == "big")},
+        # ★ 留存率导向结构（2026-10-16）：四件套 + 三段留存 + 校验口径
+        "retention_plan": {
+            "framework": ["cold_open（开场钩子）", "core_conflict（核心冲突）",
+                          "reversal（一次反转，须改变力量对比或信息格局）", "hook（集尾钩子）"],
+            "roles": [{"role": n, "ep_upto": u, "note": note}
+                      for u, n, note in RETENTION_ROLES if u < 10 ** 9]
+                     + [{"role": RETENTION_ROLES[-1][1], "ep_upto": None, "note": RETENTION_ROLES[-1][2]}],
+            "ep1_golden_3s": "EP1 前 3 秒必须出现全剧最高冲突（禁止铺垫开场）",
+            "hook_no_repeat_window": 2,   # 钩子类型不得与前 2 集连续重复
+            "rationale": "用户实测多部剧「内容吸引度不够」；本结构把留存要求变成可机器校验的硬字段。",
+        },
         "episodes": episodes_list,
         "hot_tropes": [t["name"] for t in (bd.get("tropes") or []) if t.get("count", 0) >= 2][:6],
         "differentiation_redlines": REDLINE_HARD + list(card.get("differentiation_redlines") or []),
@@ -218,6 +287,11 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
                               if src.get("present") else "未提供（按定位卡原创结构）"))
     print("  幕结构    : %s" % "；".join("%s EP%s" % (a["act"], a["ep_range"]) for a in act_structure))
     print("  钩子链    : %s" % " → ".join("%s(%s)" % (h["type"], h["ep"]) for h in hook_chain))
+    print("  留存结构  : 每集四件套（开场钩子 + 核心冲突 + 一次反转 + 集尾钩子）")
+    print("              三段：%s" % "；".join(
+        "EP1-%s %s" % (r["ep_upto"], r["role"]) for r in obj["retention_plan"]["roles"][:2])
+        + "；EP11+ %s" % obj["retention_plan"]["roles"][-1]["role"])
+    print("              EP1 = %s" % obj["retention_plan"]["ep1_golden_3s"])
     print("  爆点节拍  : 中型 %d 次（每 %d 集）/ 大型 %d 次（每 %d 集）"
           % (obj["boom_cadence"]["mid_count"], MID_BOOM_EVERY,
              obj["boom_cadence"]["big_count"], BIG_BOOM_EVERY))
@@ -433,6 +507,23 @@ def lint(ws: pathlib.Path, ep: int) -> int:
     if not (TOTAL_MIN <= total <= TOTAL_MAX):
         warns.append("总时长约 %d 秒，超出口径 %d-%d 秒（缺 DUR 时按 8 秒/镜估算）"
                      % (total, TOTAL_MIN, TOTAL_MAX))
+
+    # ★ 留存率结构校验（2026-10-16）：对册集规划里本集「四件套」做硬校验
+    bp = C.read_json(C.pdir(ws, C.BLUEPRINT)) or {}
+    row = next((e for e in (bp.get("episodes") or []) if e.get("ep") == ep), None)
+    if isinstance(row, dict):
+        for key, cn in (("cold_open", "开场钩子"), ("core_conflict", "核心冲突"),
+                        ("reversal", "一次反转"), ("hook", "集尾钩子")):
+            if not str(row.get(key) or "").strip():
+                errors.append("留存结构缺 `%s`（%s）—— 见 blueprint.json 的 retention_plan" % (key, cn))
+        # 钩子类型不得与前 2 集连续重复（防观众疲劳）
+        eps = bp.get("episodes") or []
+        cur = row.get("hook_type")
+        prev2 = [e.get("hook_type") for e in eps if ep - 2 <= e.get("ep", 0) <= ep - 1]
+        if cur and len(prev2) == 2 and prev2[0] == prev2[1] == cur:
+            warns.append("EP%d 钩子类型「%s」与前两集连续重复（建议换型）" % (ep, cur))
+    else:
+        warns.append("blueprint.json 里没有 EP%d 的规划行，无法校验留存结构" % ep)
 
     print(C.hr())
     print("④ FFS 结构自检 · EP%02d（%s）" % (ep, p))

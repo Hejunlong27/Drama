@@ -19,9 +19,29 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = ROOT / "db" / "drama.db"
-BIBLE = ROOT / "bible"
-SCRIPT = ROOT / "script"
-STORY = ROOT / "storyboard"
+
+
+def _stage(stage_key: str, legacy: str) -> Path:
+    """分阶段目录路由（与 stages/_layout.py 同口径的轻量实现）。
+
+    本文件随 `tools/` 被拷进**用户工作区**运行，拿不到仓库的 `stages/_layout.py`，
+    因此自带一份最小实现：有 `<项目根>/layout.json` 就落到阶段目录，否则保持历史布局。
+    """
+    lj = ROOT / "layout.json"
+    if lj.is_file():
+        try:
+            lay = json.loads(lj.read_text(encoding="utf-8-sig"))
+            d = (lay.get("stages") or {}).get(stage_key)
+            if d:
+                return ROOT / d
+        except Exception:                                                      # noqa: BLE001
+            pass
+    return ROOT / legacy
+
+
+BIBLE = _stage("script", "bible")
+SCRIPT = _stage("script", "script")
+STORY = _stage("storyboard", "storyboard")
 LOGS = ROOT / "logs"
 
 DEFAULT_STYLE_LOCK = (
@@ -63,9 +83,14 @@ def _conn():
 
 
 def _mkdirs() -> None:
-    for d in (BIBLE, SCRIPT, STORY, LOGS, ROOT / "assets" / "char",
-              ROOT / "assets" / "scene", ROOT / "gen" / "images",
-              ROOT / "gen" / "video", ROOT / "prompts", ROOT / "workflows",
+    """建目录。★ 2026-10-16：有 layout.json 时落到**分阶段目录**，不再在项目根散建 assets/prompts/gen。"""
+    A = _stage("assets", "assets")          # 04-资产
+    P = _stage("prompts", "prompts")        # 06-提示词
+    F = _stage("film", "gen")               # 07-成片（工具链自产素材放 _gen/ 下，避免与成片混放）
+    for d in (BIBLE, SCRIPT, STORY, LOGS,
+              A / "char", A / "scene",
+              F / "_gen" / "images", F / "_gen" / "video",
+              P, A / "workflows",
               DB_PATH.parent):
         d.mkdir(parents=True, exist_ok=True)
 

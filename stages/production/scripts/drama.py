@@ -49,10 +49,13 @@ import sys
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from _ws import WS as _WS  # noqa: E402  ★ 工作区解析（env > 位置推断 > 报错），见 scripts/_ws.py
+import _ws as _WSMOD  # noqa: E402  ★ 工作区解析 + 分阶段目录真源（见 scripts/_ws.py、stages/_layout.py）
+_WS = _WSMOD.WS
 
 WS = _WS
-VP = WS / 'video-pipeline'
+VP = _WSMOD.VP        # 引擎技术目录（config.*.json / ledger / logs）
+DATA = _WSMOD.DATA    # 出片引擎输入目录（新布局 = 06-提示词；旧布局 = video-pipeline/data）
+OUT = _WSMOD.OUT      # 出片引擎输出根（新布局 = 07-成片；旧布局 = video-pipeline/output）
 # ★ 2026-10-10 修复：收编进本仓库后，生产脚本不再住在 <工作区>/scripts/，而是**与本文件同目录**
 #   （`stages/production/scripts/`）。原先的 `WS / 'scripts'` 是上游项目布局的残留，
 #   会让 rh_doctor / cost_ledger / gen_char_assets / gen_scene_assets / gen_assets_local 全部找不到。
@@ -66,7 +69,7 @@ SKILL = pathlib.Path(os.environ.get('AI_VIDEO_PIPELINE_SKILL')
 RUN_PY = SKILL / 'scripts' / 'run.py'
 CHECK_BILLING = SKILL / 'scripts' / 'check_billing.py'
 MODEL_GATE_PY = SCRIPTS / 'model_gate.py'      # ★ 首次生图/出片前的模型选择门禁
-LOG_DIR = VP / 'output' / 'logs'
+LOG_DIR = OUT / 'logs'
 
 CNY_PER_RH = 0.0025          # 1 RH币 ≈ ¥0.0025（用户 2026-09-18）；★ 2026-09-19 用户另给 RH币↔USD：
                              # 1 美元 = 2746 RH币（1 RH币 ≈ $0.0003642）。两者隐含 USD/CNY ≈ 6.865，该汇率未确认。
@@ -196,12 +199,12 @@ def _img_size(p: pathlib.Path):
 
 
 def collect_status() -> dict:
-    shots = read_json(VP / 'data' / 'shots.json', []) or []
-    prompts = read_json(VP / 'data' / 'h3_prompts.json', {}) or {}
-    chars = read_json(VP / 'data' / 'characters.json', {}) or {}
+    shots = read_json(DATA / 'shots.json', []) or []
+    prompts = read_json(DATA / 'h3_prompts.json', {}) or {}
+    chars = read_json(DATA / 'characters.json', {}) or {}
     assets_cfg = read_json(VP / 'config.assets.json', {}) or {}
-    char_man = read_json(VP / 'data' / 'char_assets_manifest.json', {}) or {}
-    scene_man = read_json(VP / 'data' / 'scene_assets_manifest.json', {}) or {}
+    char_man = read_json(DATA / 'char_assets_manifest.json', {}) or {}
+    scene_man = read_json(DATA / 'scene_assets_manifest.json', {}) or {}
     local = read_json(VP / 'config.local.json', {}) or {}
 
     # 参考图
@@ -211,22 +214,22 @@ def collect_status() -> dict:
             continue
         p = pathlib.Path(v)
         if not p.is_absolute():
-            p = VP / 'data' / p
+            p = DATA / p
         w, h = _img_size(p) if p.is_file() else (0, 0)
         refs.append({'key': k, 'file': p.name, 'exists': p.is_file(),
                      'size': [w, h], 'h3_over_limit': max(w, h) > 5760})
 
     # 资产缺口：以「资产提示词 md 的节号」为准（与 gen_char_assets/gen_scene_assets 同一口径），
     # 不用 config.assets.json 里那套补充清单 C 号（两套编号不可混用，见人物资产文档）。
-    char_prompts = read_json(VP / 'data' / 'char_prompts.json', {}) or {}
-    scene_prompts = read_json(VP / 'data' / 'scene_prompts.json', {}) or {}
+    char_prompts = read_json(DATA / 'char_prompts.json', {}) or {}
+    scene_prompts = read_json(DATA / 'scene_prompts.json', {}) or {}
     gen_chars = {str(it.get('name')) for it in char_man.get('items', [])}
     gen_seqs = {it.get('section') for it in char_man.get('items', [])}
     gen_scene_seqs = {it.get('section') for it in scene_man.get('items', [])}
 
     # ★ 资产是资产，不分通道：本地 ComfyUI 出图（￥0）与云端计费出图**一并**计入「已生成」，
     #   避免同一个角色本地出过了、面板还在喊缺口（通道信息保留在各自 manifest 里）。
-    comfy_man = read_json(VP / 'data' / 'comfyui_assets_manifest.json', {}) or {}
+    comfy_man = read_json(DATA / 'comfyui_assets_manifest.json', {}) or {}
     comfy_items = [it for it in comfy_man.get('items', []) if it.get('files')]
     loc_chars = {it.get('section') for it in comfy_items if it.get('kind') == 'char'}
     loc_scenes = {it.get('section') for it in comfy_items if it.get('kind') == 'scene'}
@@ -248,7 +251,7 @@ def collect_status() -> dict:
 
     # 视频批次
     batches = []
-    out_root = VP / 'output'
+    out_root = OUT
     if out_root.is_dir():
         for d in sorted(out_root.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
             if not d.is_dir():
@@ -309,8 +312,8 @@ def collect_status() -> dict:
 
 def estimate_video(limit=None, only=None) -> dict:
     """按 H3 工作流的帧数公式 + 两点拟合成本，估算将提交段数与花费。"""
-    shots = read_json(VP / 'data' / 'shots.json', []) or []
-    prompts = read_json(VP / 'data' / 'h3_prompts.json', {}) or {}
+    shots = read_json(DATA / 'shots.json', []) or []
+    prompts = read_json(DATA / 'h3_prompts.json', {}) or {}
     sel = shots
     if only:
         want = {o.strip() for o in only}
@@ -473,6 +476,11 @@ def cmd_models(args) -> int:
         cmd += ['set'] + list(args.pairs or [])
         if getattr(args, 'detail', None):
             cmd += ['--detail', args.detail]
+        # ★ 执行依据（ComfyUI 工作流 API 文件 / 云端地址 / RH 应用地址）透传
+        for flag in ('comfy_url', 'comfy_workflow', 'app_url', 'app_id', 'workflow_id'):
+            v = getattr(args, flag, None)
+            if v:
+                cmd += ['--' + flag.replace('_', '-'), str(v)]
     elif getattr(args, 'models_cmd', None) == 'reset':
         cmd += ['reset', args.kind]
     elif getattr(args, 'models_cmd', None) == 'ask':
@@ -553,8 +561,8 @@ def cmd_assets(args) -> int:
               % ('★真实提交' if args.submit else '干跑，不花钱'))
         rc, _, _ = run_cmd(cmd, 'assets_scene', quiet_ok=False)
         total_rc |= rc
-    print('\n产物清单：%s' % (VP / 'data' / 'char_assets_manifest.json'))
-    print('          %s' % (VP / 'data' / 'scene_assets_manifest.json'))
+    print('\n产物清单：%s' % (DATA / 'char_assets_manifest.json'))
+    print('          %s' % (DATA / 'scene_assets_manifest.json'))
     return total_rc
 
 
@@ -562,7 +570,7 @@ def cmd_assets(args) -> int:
 # video：计划 / 出片 / 批次进度
 # ---------------------------------------------------------------------------
 def _latest_batch() -> str:
-    out_root = VP / 'output'
+    out_root = OUT
     best, best_t = None, 0.0
     if out_root.is_dir():
         for d in out_root.iterdir():
@@ -632,7 +640,7 @@ def cmd_video_status(args) -> int:
     if not batch:
         print('还没有任何批次（output/<批次>/summary.json 不存在）')
         return 1
-    s = read_json(VP / 'output' / batch / 'summary.json', {}) or {}
+    s = read_json(OUT / batch / 'summary.json', {}) or {}
     t = s.get('totals', {}) or {}
     u = s.get('usage', {}) or {}
     fuse = s.get('fuse', {}) or {}
@@ -656,7 +664,7 @@ def cmd_video_status(args) -> int:
         for x in bad[:20]:
             print('  %-16s %-9s %s' % (x.get('shot_id'), x.get('video_status'),
                                        str(x.get('error'))[:70]))
-    d = VP / 'output' / batch
+    d = OUT / batch
     finals = list(d.glob('*/final.mp4'))
     print('产物   : %s（final.mp4 %d 个）' % (d, len(finals)))
     if finals:
@@ -806,19 +814,25 @@ def main() -> int:
     p.add_argument('--write-config', action='store_true', help='顺带把 characters.json 指到新目录')
     p.set_defaults(fn=cmd_refs)
 
-    # ★ 模型选择门禁（前置条件）：首次生图 / 首次出片前必须先确认
-    p = sub.add_parser('models', help='首次生图/出片前确认模型：本地ComfyUI / RunningHub / 闭源模型')
+    # ★ 模型选择门禁（前置条件）：首次生图 / 首次出片前必须先确认「依托哪条通道」
+    p = sub.add_parser('models', help='首次生图/出片前确认通道：本地ComfyUI / 云端ComfyUI / RH AI应用 / 闭源模型')
     ms = p.add_subparsers(dest='models_cmd')
-    q = ms.add_parser('list', help='打印可选模型清单')
+    q = ms.add_parser('list', help='打印可选通道清单（含各自必需的执行依据）')
     q.set_defaults(fn=cmd_models)
-    q = ms.add_parser('status', help='查看当前确认状态（只读）')
+    q = ms.add_parser('status', help='查看当前确认状态与执行依据是否齐备（只读）')
     q.add_argument('--json', action='store_true')
     q.set_defaults(fn=cmd_models)
     q = ms.add_parser('set', help='记录确认：set image=local_comfyui [video=runninghub]')
     q.add_argument('pairs', nargs='+', metavar='kind=choice')
     q.add_argument('--detail', default=None)
+    q.add_argument('--comfy-url', dest='comfy_url', default=None, help='ComfyUI 服务地址（本地/云端）')
+    q.add_argument('--comfy-workflow', dest='comfy_workflow', default=None,
+                   help='ComfyUI 工作流 API 文件路径（「导出（API）」得到的 json）')
+    q.add_argument('--app-url', dest='app_url', default=None, help='RunningHub AI 应用地址')
+    q.add_argument('--app-id', dest='app_id', default=None, help='RunningHub AI 应用 ID（webappId）')
+    q.add_argument('--workflow-id', dest='workflow_id', default=None, help='RunningHub 工作流 ID')
     q.set_defaults(fn=cmd_models)
-    q = ms.add_parser('reset', help='清除某类确认（换模型前用）')
+    q = ms.add_parser('reset', help='清除某类确认（换通道前用）')
     q.add_argument('kind', choices=('image', 'video'))
     q.set_defaults(fn=cmd_models)
     q = ms.add_parser('ask', help='交互式引导确认（需 TTY）')

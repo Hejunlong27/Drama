@@ -22,6 +22,13 @@ import os
 import pathlib
 import sys
 
+# 分阶段目录真源（stages/_layout.py）：本层只保留历史相对路径写法，由它统一改写
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+try:
+    import _layout as _L  # noqa: E402
+except Exception:          # noqa: BLE001
+    _L = None
+
 # ---------------------------------------------------------------------------
 # 目录约定（全部落在**工作区**，不进仓库）
 # ---------------------------------------------------------------------------
@@ -115,7 +122,24 @@ def resolve_ws(explicit=None) -> pathlib.Path:
 
 
 def pdir(ws, rel: str) -> pathlib.Path:
+    """把历史相对路径解析成**实际路径**。
+
+    走 `_layout.stage_rel` —— 有 `layout.json` 的项目会自动落到分阶段目录
+    （`creation/market/x.json` → `<ws>/01-调研/x.json`）；旧项目原样不变。
+    """
+    if _L is not None:
+        try:
+            rel = _L.stage_rel(ws, rel)
+        except Exception:      # noqa: BLE001
+            pass
     return pathlib.Path(ws) / rel
+
+
+def stage_dir(ws, key: str) -> pathlib.Path:
+    """取某阶段目录的绝对路径（新布局）；旧布局下报可读错误。"""
+    if _L is None:
+        raise RuntimeError("stages/_layout.py 不可用")
+    return _L.stage_dir(ws, key)
 
 
 # ---------------------------------------------------------------------------

@@ -31,10 +31,9 @@ from PIL import Image
 sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # noqa: E402
-from _ws import WS  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
-VP = WS / "video-pipeline"
-DATA = VP / "data"
-OUT = VP / "output" / "assets"
+from _ws import WS, DATA, OUT as OUT_ROOT  # noqa: E402  ★ 工作区解析 + 分阶段目录真源
+VP = WS / "video-pipeline"      # 引擎技术目录
+OUT = OUT_ROOT / "assets"        # 资产出图落点（= 07-成片/assets）
 REFS_H3 = DATA / "refs_h3"
 CFG = DATA / "characters.json"
 

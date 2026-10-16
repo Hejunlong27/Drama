@@ -28,7 +28,7 @@ sys.path.insert(0, str(HERE))
 import episode_preflight as PF  # noqa: E402
 
 WS = PF.WS  # ★ 工作区解析沿用 episode_preflight（env SOLODRAMA_WORKSPACE > 位置推断 > 报错）
-DATA = WS / "video-pipeline" / "data"
+DATA = PF.DATA   # ★ 分阶段目录真源（经 episode_preflight → _ws → stages/_layout.py）
 
 
 def main() -> int:

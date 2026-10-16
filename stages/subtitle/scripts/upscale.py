@@ -80,12 +80,55 @@ def resolve_ws():
     if env and os.path.isdir(env):
         return os.path.abspath(env), ""
     cand = os.path.dirname(d)
-    if os.path.isdir(os.path.join(cand, "video-pipeline", "data")):
+    if (os.path.isdir(os.path.join(cand, "video-pipeline", "data"))
+            or os.path.isfile(os.path.join(cand, "layout.json"))):
         return cand, ""
     return None, _HINT
 
 
 WS, WS_HINT = resolve_ws()
+
+
+# ------------------------------------------------- 分阶段目录（stages/_layout.py 的轻量复刻）
+# 与 subtitle.py 内那份**保持逐字一致**；两处都自带实现是有意为之 ——
+# 本脚本可能被拷进 Skill 包运行，那时仓库的 stages/_layout.py 不在 sys.path 上。
+def _layout_paths(ws):
+    """返回 (engine_root, data_dir, out_dir)，均为绝对路径。"""
+    ws = os.path.abspath(ws)
+    eng = os.path.join(ws, "video-pipeline")
+    data_rel = out_rel = None
+    lj = os.path.join(ws, "layout.json")
+    if os.path.isfile(lj):
+        try:
+            lay = json.load(open(lj, encoding="utf-8-sig"))
+            if isinstance(lay, dict):
+                eng = os.path.join(ws, lay.get("engine_root") or "video-pipeline")
+                data_rel, out_rel = lay.get("data_rel"), lay.get("out_rel")
+        except Exception:                                                  # noqa: BLE001
+            pass
+    cl = os.path.join(eng, "config.local.json")
+    if os.path.isfile(cl):
+        try:
+            cfg = json.load(open(cl, encoding="utf-8-sig"))
+            if isinstance(cfg, dict):
+                data_rel = cfg.get("data_dir") or data_rel
+                out_rel = cfg.get("out_dir") or out_rel
+        except Exception:                                                  # noqa: BLE001
+            pass
+
+    def _r(rel, fallback):
+        rel = rel or fallback
+        return os.path.abspath(rel) if os.path.isabs(rel) else os.path.abspath(os.path.join(eng, rel))
+
+    return eng, _r(data_rel, "data"), _r(out_rel, "output")
+
+
+def engine_root_of(ws):
+    return _layout_paths(ws)[0]
+
+
+def out_dir_of(ws):
+    return _layout_paths(ws)[2]
 
 EXE_SUFFIX = ".exe"
 FFMPEG_NAME = "ffmpeg" + EXE_SUFFIX
@@ -211,7 +254,7 @@ def deep_merge(base, override):
 
 
 def load_config(ws, path=None):
-    p = path or os.path.join(ws, "video-pipeline", "config.upscale.json")
+    p = path or os.path.join(engine_root_of(ws), "config.upscale.json")
     cfg = deep_merge(DEFAULT_CONFIG, load_json(p, {}) or {})
     cfg["_config_path"] = p
     cfg["_config_exists"] = os.path.exists(p)
@@ -656,7 +699,7 @@ def run_ffmpeg(cmd, env, log_path, total_frames, quiet=False):
 def upscale_episode(ws, ep, cfg, *, force=False, dry_run=False, verify_only=False,
                     fallback_lanczos=False, target_override=None, quiet=False,
                     allow_flat=False, sample=0.0, out_path=None):
-    subs_dir = os.path.join(ws, "video-pipeline", "output", "subs", ep)
+    subs_dir = os.path.join(out_dir_of(ws), "subs", ep)
     src = os.path.join(subs_dir, "%s_master.mp4" % ep)
     dst = out_path or os.path.join(subs_dir, "%s_master_2k.mp4" % ep)
     # 自定义输出（测速样片）时，报告也写到旁边去，绝不覆盖正式产物的 <ep>_upscale.json

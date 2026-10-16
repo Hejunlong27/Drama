@@ -38,9 +38,8 @@ from datetime import datetime
 # 常量
 # --------------------------------------------------------------------------
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # noqa: E402
-from _ws import WS  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错），见 scripts/_ws.py
+from _ws import WS, DATA, OUT as OUT_ROOT  # noqa: E402  ★ 工作区解析 + 分阶段目录真源
 VP = WS / 'video-pipeline'
-DATA = VP / 'data'
 AUTO_RUNS = VP / 'ledger' / 'runs'
 DSH_HOME = pathlib.Path(os.environ.get('DSH_HOME') or (pathlib.Path.home() / '.dsh'))
 TOKEN_LEDGER = DSH_HOME / 'storages' / 'cost-meter' / 'ledger.json'
@@ -741,7 +740,7 @@ def build_xlsx_ctx(drama, batches, by_ep, tokens, attr, rates, state_prev) -> tu
     # 资产名从清单补（key 形如 char_10 → 用清单里的名字）
     name_map = {}
     for fn in ('char_assets_manifest.json', 'scene_assets_manifest.json'):
-        f = VP / 'data' / fn
+        f = DATA / fn
         if f.is_file():
             try:
                 for it in json.loads(f.read_text(encoding='utf-8')).get('items', []):
@@ -761,7 +760,7 @@ def build_xlsx_ctx(drama, batches, by_ep, tokens, attr, rates, state_prev) -> tu
         outdir = ''
         for b in batches.values():
             if ep in episodes_of(b):
-                outdir = str(VP / 'output' / b['batch_id'])
+                outdir = str(OUT_ROOT / b['batch_id'])
                 break
         episodes.append({'ep': ep, 'shots': v['shots'], 'ok': v['ok'], 'fail': v['fail'],
                          'rh': round(v['as_rh'], 1), 'dur': None, 'outdir': outdir})

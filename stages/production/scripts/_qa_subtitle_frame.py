@@ -23,9 +23,9 @@ import sys
 from PIL import Image, ImageChops
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # noqa: E402
-from _ws import WS as _WS_ROOT  # noqa: E402  ★ 工作区解析（env SOLODRAMA_WORKSPACE > 位置推断 > 报错）
+from _ws import WS as _WS_ROOT, VP as _VP_ROOT, OUT as _OUT_ROOT  # noqa: E402  ★ 工作区解析 + 分阶段目录真源
 WS = str(_WS_ROOT)
-SUBS = os.path.join(WS, "video-pipeline", "output", "subs")
+SUBS = os.path.join(str(_OUT_ROOT), "subs")
 SAMPLES = 5          # 每条字幕取几帧求交集
 THRESH = 40          # 差异阈值，滤掉重编码噪声
 BAND_RATIO = 220 / 832.0   # 底部度量带占画面高度的比例（原来写死 220 是按 1440x832 定的）
@@ -88,7 +88,7 @@ def main():
         n = int(argv[i + 1])
         argv = argv[:i] + argv[i + 2:]
     args = [a for a in argv if not a.startswith("--")]
-    cfg = json.load(open(os.path.join(WS, "video-pipeline", "config.subtitle.json"),
+    cfg = json.load(open(os.path.join(str(_VP_ROOT), "config.subtitle.json"),
                          encoding="utf-8"))
     CW, CH = cfg["canvas"]["width"], cfg["canvas"]["height"]
     lc = cfg["languages"]["zh"]

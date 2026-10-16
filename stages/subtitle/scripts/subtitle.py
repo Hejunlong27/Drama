@@ -60,12 +60,63 @@ def default_workspace():
     if env and os.path.isdir(env):
         return os.path.abspath(env)
     cand = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if os.path.isdir(os.path.join(cand, "video-pipeline", "data")):
+    if (os.path.isdir(os.path.join(cand, "video-pipeline", "data"))
+            or os.path.isfile(os.path.join(cand, "layout.json"))):
         return cand
     return None
 
 
 ROOT = default_workspace()
+
+
+# ------------------------------------------------- 分阶段目录（stages/_layout.py 的轻量复刻）
+# 为什么要自带一份：本脚本可能被拷进 Skill 包运行，那时仓库的 stages/_layout.py
+# 不在 sys.path 上（见 upscale.py 顶部同类约束）。口径必须与 stages/_layout.py 一致：
+#   <engine_root>/config.local.json 的 data_dir / out_dir  →  <ws>/layout.json  →  旧默认 data/output
+def _layout_paths(ws):
+    """返回 (engine_root, data_dir, out_dir)，均为绝对路径。"""
+    ws = os.path.abspath(ws)
+    eng = os.path.join(ws, "video-pipeline")
+    data_rel = out_rel = None
+    lj = os.path.join(ws, "layout.json")
+    if os.path.isfile(lj):
+        try:
+            lay = json.load(open(lj, encoding="utf-8-sig"))
+            if isinstance(lay, dict):
+                eng = os.path.join(ws, lay.get("engine_root") or "video-pipeline")
+                data_rel, out_rel = lay.get("data_rel"), lay.get("out_rel")
+        except Exception:                                                  # noqa: BLE001
+            pass
+    cl = os.path.join(eng, "config.local.json")
+    if os.path.isfile(cl):
+        try:
+            cfg = json.load(open(cl, encoding="utf-8-sig"))
+            if isinstance(cfg, dict):
+                data_rel = cfg.get("data_dir") or data_rel
+                out_rel = cfg.get("out_dir") or out_rel
+        except Exception:                                                  # noqa: BLE001
+            pass
+
+    def _r(rel, fallback):
+        rel = rel or fallback
+        return os.path.abspath(rel) if os.path.isabs(rel) else os.path.abspath(os.path.join(eng, rel))
+
+    return eng, _r(data_rel, "data"), _r(out_rel, "output")
+
+
+def engine_root_of(ws):
+    """引擎技术目录（config.*.json / ledger / logs）。"""
+    return _layout_paths(ws)[0]
+
+
+def data_dir_of(ws):
+    """出片引擎输入目录（含 shots.json / h3_prompts.json）。"""
+    return _layout_paths(ws)[1]
+
+
+def out_dir_of(ws):
+    """出片引擎输出根（批次 / assets / subs 都在它下面）。"""
+    return _layout_paths(ws)[2]
 
 
 def harden_stdio():
@@ -110,7 +161,7 @@ def dump_json(p, obj):
 # ---------------------------------------------------------------- 配置与素材
 
 def load_config(ws):
-    p = os.path.join(ws, "video-pipeline", "config.subtitle.json")
+    p = os.path.join(engine_root_of(ws), "config.subtitle.json")
     if not os.path.exists(p):
         raise SystemExit("找不到配置：%s" % p)
     return load_json(p)
@@ -158,9 +209,9 @@ def episode_segments(ws, ep):
       B. output/<引擎目录>/<批次>/<段>/final.mp4 —— 《贤妻不装了》的 h3_free / h3_free_acc2 两层结构
     同一段在多处存在时取 **mtime 最新**（错脸返工重出后必须用新版本）。
     """
-    shots = load_json(os.path.join(ws, "video-pipeline", "data", "shots.json"))
+    shots = load_json(os.path.join(data_dir_of(ws), "shots.json"))
     ids = [s["shot_id"] for s in shots if s["shot_id"].startswith(ep + "_")]
-    outdir = os.path.join(ws, "video-pipeline", "output")
+    outdir = out_dir_of(ws)
     segs, missing = [], []
     for sid in ids:
         cands = [f for f in glob.glob(os.path.join(outdir, "*", "*", sid, "final.mp4"))
@@ -179,7 +230,7 @@ def episode_segments(ws, ep):
 
 def dialogue_lines(ws, ep):
     """从 h3_prompts.json 取该集每段的 <d> 台词（按顺序）。"""
-    prompts = load_json(os.path.join(ws, "video-pipeline", "data", "h3_prompts.json"))
+    prompts = load_json(os.path.join(data_dir_of(ws), "h3_prompts.json"))
     pat = re.compile(r"<d>\[[^\]]*\]\s*([^<]*)</d>")
     out = {}
     for sid, v in prompts.items():
@@ -1228,12 +1279,12 @@ def main():
             "找不到短剧工作区。请二选一：\n"
             "  ① --workspace \"<项目根目录>\"\n"
             "  ② 设环境变量：$env:SOLODRAMA_WORKSPACE = \"<项目根目录>\"  （PowerShell）\n"
-            "工作区的标志物是 <项目根>/video-pipeline/data/ 与 config.subtitle.json。")
+            "工作区的标志物是 <项目根>/layout.json（新布局）或 <项目根>/video-pipeline/（旧布局）。")
     ws = os.path.abspath(args.workspace)
     cfg = load_config(ws)
     if args.lang:
         cfg["default_language"] = args.lang
-    subs_dir = os.path.join(ws, "video-pipeline", "output", "subs", args.ep)
+    subs_dir = os.path.join(out_dir_of(ws), "subs", args.ep)
     os.makedirs(subs_dir, exist_ok=True)
 
     # ---- 高清放大：决定「字幕最终烧在多大的画布上」------------------------

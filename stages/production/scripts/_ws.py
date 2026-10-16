@@ -26,8 +26,17 @@ import os
 import sys
 from pathlib import Path
 
+# 分阶段目录真源（stages/_layout.py）：本文件只做「解析工作区」，目录映射一律问它
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+try:
+    import _layout as L  # noqa: E402
+except Exception:  # noqa: BLE001  （极端情况下退化为旧布局，不阻塞主流程）
+    L = None
+
 # 判定「这个目录就是短剧工作区」的标志物
 MARKERS = (
+    Path("layout.json"),
+    Path("model-plan.json"),
     Path("video-pipeline") / "data" / "shots.json",
     Path("video-pipeline") / "data",
 )
@@ -104,5 +113,42 @@ def resolve_lenient(explicit=None):
 # 绝大多数脚本直接用这个
 WS: Path = resolve()
 
-# 视频管线根（本项目约定：<工作区>/video-pipeline）
-VP: Path = WS / "video-pipeline"
+# 引擎技术目录（config.*.json / ledger / logs）。新布局下仍叫 video-pipeline，
+# 但 data/ 与 output/ 可能已被 layout.json 指到阶段目录 —— 所以**不要**用它拼 data/output。
+VP: Path = (L.engine_root(WS) if L else WS / "video-pipeline")
+
+# ★ 2026-10-16：出片引擎的输入/输出目录一律用这两个（分阶段目录真源）
+DATA: Path = (L.data_dir(WS) if L else VP / "data")
+OUT: Path = (L.out_dir(WS) if L else VP / "output")
+
+# 台账与日志仍在引擎目录下（不随阶段目录迁移）
+LEDGER: Path = VP / "ledger"
+LOGS: Path = VP / "logs"
+
+
+def layout() -> dict:
+    """当前工作区的分阶段目录映射（缺 layout.json 时为旧布局）。"""
+    return L.load(WS) if L else {"_fallback": True, "stages": {}}
+
+
+def stage(key: str) -> Path:
+    """取某阶段目录（新布局）；旧布局下抛出可读错误。"""
+    if not L:
+        raise RuntimeError("stages/_layout.py 不可用，无法解析阶段目录")
+    return L.stage_dir(WS, key)
+
+
+# ★ 2026-10-16：函数式解析（**必须用这两个**，不要在导入期固化 DATA/OUT）
+#   原因：`DATA` / `OUT` 是在 import 期用环境变量/位置推断算出来的常量。
+#   对接受 `--workspace` 的脚本（convert_storyboard / ingest_check / script_timing_check 等），
+#   必须按**参数里的工作区**重新解析，否则 `--workspace` 会被静默忽略 —— 这是本轮实测抓到的真缺陷。
+def data_dir(ws=None) -> Path:
+    """按指定工作区解析出片引擎输入目录（None = 用模块级 WS）。"""
+    w = Path(ws).expanduser().resolve() if ws else WS
+    return L.data_dir(w) if L else (w / "video-pipeline" / "data")
+
+
+def out_dir(ws=None) -> Path:
+    """按指定工作区解析出片引擎输出根。"""
+    w = Path(ws).expanduser().resolve() if ws else WS
+    return L.out_dir(w) if L else (w / "video-pipeline" / "output")
