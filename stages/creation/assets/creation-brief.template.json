@@ -11,8 +11,8 @@
     "<狼人奇幻>"
   ],
   "budget_tier": "<低|中|高>",
-  "ep_total": 60,
-  "ep_seconds": 90,
+  "ep_total": 40,
+  "ep_seconds": 70,
   "style_hint": "<可选：色卡/基调偏好>",
   "notes": "<其他约束，如：源剧本很颠，保留其核心爽点>"
 }

@@ -43,7 +43,7 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 
 | 阶段 | 模块 | 功能 |
 |---|---|---|
-| **创作** | `stages/creation/` | ① 榜单调研与对比（多市场横向比较 + 西语重点）→ ② 爆款拆解（题材分布 / 套路库 / 爆点 / 内容偏好 / 差异化趋势）→ ③ 选题定位（七维加权评分 + 定位卡）→ ④ 剧本改写（源剧本 → N 集规划，默认 60 集，每集含核心冲突 / 反转 / 钩子） |
+| **创作** | `stages/creation/` | ① 榜单调研与对比（多市场横向比较 + 西语重点）→ ② 爆款拆解（题材分布 / 套路库 / 爆点 / 内容偏好 / 差异化趋势）→ ③ 选题定位（七维加权评分 + 定位卡）→ ④ 剧本改写（源剧本 → N 集规划，默认 **40 集 × 70 秒**，每集含开场钩子 / 核心冲突 / 反转 / 集尾钩子） |
 | **资产** | `stages/assets/` | 资产卡提示词净化（14 条纪律）+ 三类模板 + `md → 清单` 转换；出图双通路：**本地 ComfyUI（默认，￥0）** 与 RunningHub 云端（★计费） |
 | **接线** | `stages/production/` | 参考图落位接线（`<Picture N>` ↔ refs 顺序一致）、悬空图槽 / 超 6 槽体检、参考图瘦身 |
 | **出片** | `stages/video/workflow/` | RunningHub「工作流 + AI 应用」标准通道批量出片：`doctor` 体检 → 干跑计划 → 小样 → 全量；taskId 级断点续跑、并发上限 5（单账号，见下方说明）、计费预估与用量核对 |
@@ -175,16 +175,25 @@ AI 短剧批量生产的**本地全链路工具集**：**创作**与**成片**�
 > 此前分散在多个 WorkBuddy Skill 里的流程、规则与门禁，已收敛为「一份总纲 + 一套预置脚本 + 一个 CLI」。
 > 全流程、目录规范与硬规则见 **[`docs/orchestration/生产流程总纲.md`](docs/orchestration/生产流程总纲.md)**（单一真源）。
 >
-> **开跑前必须先过通道确认门禁**（每次任务开始前）：
+> **开跑前必须先过两道前置门禁**（每次任务开始前，**顺序不可颠倒**）：
 >
 > ```powershell
-> python stages/production/scripts/drama.py models status   # 看生图/视频通道与「执行依据」是否齐备
+> # ① 画风三轨（最先：它决定资产/时长/提示词规格，换了等于已产出素材全部作废）
+> python stages/production/scripts/drama.py style status
+> python stages/production/scripts/drama.py style set 3d_manhua --sub-mode guoman-3d-render
+> #    三选一：3d_manhua（3D 漫剧）/ 2d_animation（2D 动画）/ live_action（真人写实）
+>
+> # ② 生图/视频通道 + 执行依据
+> python stages/production/scripts/drama.py models status
 > python stages/production/scripts/drama.py models set image=local_comfyui video=runninghub --workflow-id <ID>
 > ```
 >
 > 通道四选一：**本地 ComfyUI（￥0）/ 云端 ComfyUI / RunningHub AI 应用 / 闭源模型**。
 > 选了**云端 ComfyUI** 必须同时提供**服务地址 + 工作流 API 文件**；选了 **RH AI 应用**必须提供**应用地址**；
 > 缺依据即停在关卡（退出码 4），不许开工。
+>
+> 画风完整规格（资产 / 分镜 / H3 提示词 · 单一真源）见
+> **[`docs/styles/画风三轨规范.md`](docs/styles/画风三轨规范.md)**。
 
 先分清你是哪一类 —— 两条路线的入口、前置与产出完全不同：
 
@@ -239,7 +248,7 @@ https://github.com/Hejunlong27/SoloDrama
 
 【故事】<把你的故事或小说粘在这里>
 【平台】竖屏（TikTok / 红果风格）
-【规格】10 集，每集约 90 秒
+【规格】40 集，每集约 70 秒（默认口径）
 
 请走完整流程：选题 → 世界观与人物 → 剧本 → 分镜与视频提示词 →
 资产出图 → 渲染出片 → 拼接 2K → 字幕 → 成本台账。
@@ -279,13 +288,19 @@ python stages/production/scripts/drama.py models set image=local_comfyui video=r
 # ---- 每集循环：顺序执行；带 ★ 的会花钱，都需要你显式确认 ----
 python stages/production/scripts/drama.py status          # 先看全盘状态（零网络）
 
-# ⓪ 通道确认（★ 首次必做；每次任务开始前先看一遍）
-python stages/production/scripts/drama.py models status
+# ⓪ 前置门禁（★ 首次必做；每次任务开始前先看一遍，顺序不可颠倒）
+python stages/production/scripts/drama.py style status     # ① 画风三轨（最先）
+python stages/production/scripts/drama.py style set 3d_manhua --sub-mode guoman-3d-render
+python stages/production/scripts/drama.py models status    # ② 生图/视频通道 + 执行依据
 python stages/production/scripts/drama.py models set image=<local_comfyui|cloud_comfyui|runninghub|closed_source> \
         video=<local_comfyui|cloud_comfyui|runninghub|runninghub_ai_app|closed_source> \
         [--comfy-url ...] [--comfy-workflow <导出的工作流API.json>] [--app-url ...] [--workflow-id ...]
 
-# ⓪.5 分镜/提示词 → data/ 四文件 + 入门口禁（零费用，把错误挡在计费之前）
+# ⓪.5 半解说结构三类硬校验（读 05-分镜/storyboard.json；零费用）
+python stages/production/scripts/drama.py halfcheck all     # 旁白时间窗 / 资产规格 / 首帧锚点
+python stages/production/scripts/drama.py halfcheck windows # 只查旁白/对白时间窗
+
+# ⓪.6 分镜/提示词 → data/ 四文件 + 入门口禁（零费用，把错误挡在计费之前）
 python stages/production/scripts/convert_storyboard.py --workspace <工作区> --ep ep01            # 干跑
 python stages/production/scripts/convert_storyboard.py --workspace <工作区> --ep ep01 --apply    # 真写
 python stages/production/scripts/ingest_check.py      --workspace <工作区> --ep ep01
@@ -418,9 +433,13 @@ SoloDrama/
 | 主题 | 文档 |
 |---|---|
 | **生产流程总纲（流程 · 目录规范 · 硬规则 · 门禁）★ 单一真源** | `docs/orchestration/生产流程总纲.md` |
+| **画风三轨规范（资产 / 分镜 / H3 提示词）★ 单一真源** | `docs/styles/画风三轨规范.md` |
 | **技能映射、缺口台账与重叠裁决** | `docs/orchestration/技能映射与缺口.md` |
 | **发布前合规预检清单（TikTok 口径）** | `docs/compliance/发布前合规预检清单.md` |
 | **台词时长审计口径（4.2 字/秒）** | `docs/creation/台词时长审计口径.md` |
+| **剧本强度工程（爽点结构 · 打脸五拍 · 质控标准）★** | `docs/creation/剧本强度工程.md` |
+| **题材公式库（女频逆袭，可扩展；命中即跳过选题）** | `stages/creation/references/genre-formulas/` |
+| **转译语种注册表（西/英/日/韩/葡/泰/印尼/越 + 中文）** | `stages/creation/references/translation-languages.json` |
 | 改造背景、可行性分析 | `docs/可行性检查报告.md` |
 | 架构、数据契约、执行流程 | `docs/Agent项目技术文档.md` |
 | **西语漫剧创作链路（四部分）** | `stages/creation/README.md` |

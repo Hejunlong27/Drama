@@ -37,7 +37,7 @@
 │   └── 03-script/
 │       ├── source-script.md                          # 待改写的「很颠」源剧本（人工放入）
 │       ├── reference-structure.json                  # 对标结构（可选）
-│       ├── blueprint.json / blueprint.md             # ④ N 集规划（默认 60）
+│       ├── blueprint.json / blueprint.md             # ④ N 集规划（默认 40）
 │       ├── script-brief.md                           # 给 LLM 的改写指令书
 │       └── skeleton_ep_XX.md                         # FFS 骨架
 └── video-pipeline/                                   # 引擎侧数据契约（data/ output/ ledger/）

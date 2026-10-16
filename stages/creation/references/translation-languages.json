@@ -1,0 +1,541 @@
+{
+  "version": 1,
+  "updated": "2026-10-16",
+  "purpose": "剧本转译的语种注册表（单一真源）。脚本 script_translate.py 读它做预算与质检；提示词 prompts/s0b-script-translate.md 读它做写作规范。",
+  "workflow": "用户给小说/剧本 + 指定语种 → `script_translate.py plan --to <lang>` 出转译工作单 → LLM 转译 → `script_translate.py check --to <lang>` 质检通过 → 才允许进 ④剧本改写（s3）。",
+  "default_source": "auto",
+  "auto_detect_note": "源语种未给时按字符集与特征词自动判定（CJK=zh/ja/ko，西里尔/拉丁按高频词）。判定不确定必须问用户，不许猜。",
+  "speech_rate_formula": "目标语单位数 ≈ 台词语音时长(秒) × 语速中值。中文口径沿用项目既定的 4.2 字/秒（见 docs/creation/台词时长审计口径.md）。",
+  "budget_rule": "转译稿的台词预算**不得超过**源稿时长对应的目标语上限；超限即判定超载，须改写而不是加快语速。",
+  "languages": {
+    "zh-CN": {
+      "label": "简体中文",
+      "native_name": "中文（简体）",
+      "aliases": [
+        "中文",
+        "汉语",
+        "普通话",
+        "zh",
+        "zh-cn",
+        "chinese",
+        "mandarin"
+      ],
+      "script": "cjk",
+      "speech_rate": {
+        "unit": "char",
+        "min": 2.0,
+        "target": [
+          3.0,
+          4.2
+        ],
+        "max": 8.5,
+        "unit_label": "字/秒"
+      },
+      "oral_rules": [
+        "短剧口语：短句、动词开头、少书面连接词（「因此/然而/综上」禁用）。",
+        "称谓按人物关系直接叫（爸/姐/老板/陈总），不用「您」除非明确是下级对上级。",
+        "旁白用第一人称短句，不做背景交代。"
+      ],
+      "forbidden_phrases": [
+        "综上所述",
+        "众所周知",
+        "不难看出",
+        "值得一提的是",
+        "在此情境下"
+      ],
+      "punctuation": {
+        "quotes": "「」或“”",
+        "comma": "，",
+        "ellipsis": "……",
+        "note": "全角标点"
+      },
+      "localization": [
+        "货币用「元/万」",
+        "计量用公制",
+        "节日按中式（春节/中秋）"
+      ],
+      "name_policy": "保留中文姓名。",
+      "script_markers": "[一-鿿]",
+      "foreign_script_pattern": "[A-Za-z]{6,}|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.05,
+        "min_marker_ratio": 0.6
+      }
+    },
+    "es-419": {
+      "label": "西班牙语（拉美通用）",
+      "native_name": "Español (Latinoamérica)",
+      "aliases": [
+        "西语",
+        "西班牙语",
+        "拉美西语",
+        "es",
+        "es-419",
+        "espanol",
+        "español",
+        "spanish",
+        "latam"
+      ],
+      "script": "latin",
+      "chars_per_word": 5.0,
+      "detect_stopwords": [
+        "el",
+        "la",
+        "los",
+        "las",
+        "que",
+        "de",
+        "y",
+        "para",
+        "pero",
+        "muy",
+        "usted",
+        "tú"
+      ],
+      "speech_rate": {
+        "unit": "word",
+        "min": 3.0,
+        "target": [
+          3.5,
+          4.0
+        ],
+        "max": 5.0,
+        "unit_label": "词/秒"
+      },
+      "oral_rules": [
+        "用**拉美通用口语**（es-419），避用西班牙本土特有词（用 carro 不用 coche，用 celular 不用 móvil，用 computadora 不用 ordenador，用 jugo 不用 zumo）。",
+        "第二人称按关系选：亲近用 `tú/tu`，正式/长辈用 `usted`（拉美常用 usted，比西班牙语更普遍）。",
+        "多用缩写式口语与省略主语（西语动词变位自带人称，代词冗赘反而生硬）。",
+        "对白短促，避免一长句套多个从句（配音时长会撑爆）。"
+      ],
+      "forbidden_phrases": [
+        "hac|hiz|hace|hacen|haga una decisión（英语直译；西语应 tomar una decisión）",
+        "hac|hiz|hace|hacen sentido（英语直译；西语应 tener sentido）",
+        "No problema（英语直译；应为 Sin problema / Ningún problema）",
+        "~ realizar 与 darse cuenta 混用（realizar = 实现/执行；意识到 = darse cuenta）",
+        "~ actualmente 当 actually 用（actualmente = 目前；actually = en realidad）",
+        "~ suportar 直译 support（应为 apoyar / aguantar，按语义选）",
+        "~ 用西班牙本土词（coche / móvil / ordenador / zumo）—— 应改拉美词"
+      ],
+      "punctuation": {
+        "quotes": "«»（西语书面）或 “”（网络/字幕）",
+        "question": "¿...?",
+        "exclamation": "¡...!",
+        "dash": "—（对白前用长破折号，非引号）",
+        "note": "疑问句与感叹句**必须带倒置符号**，这是最直观的「是否真西语」判定点。"
+      },
+      "localization": [
+        "货币：USD / 比索 / 雷亚尔，按剧中设定，勿出现人民币。",
+        "人名：拉丁姓氏可代入（Rosa / Valentina / Diego / Mateo）；中文名可音译保留或改本地名，同一剧内必须统一。",
+        "文化锚点：家庭/教母/阶层/都市/足球/宗教节日，避免中式家庭结构直搬（如「彩礼」需改写为可理解的等价物）。"
+      ],
+      "name_policy": "统一人名表（转译前先出 glossary），同一角色全剧只能有一种写法。",
+      "script_markers": "[áéíóúñ¿¡ü]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.02,
+        "min_marker_ratio": 0.02
+      }
+    },
+    "en-US": {
+      "label": "英语（美式）",
+      "native_name": "English (US)",
+      "aliases": [
+        "英语",
+        "英文",
+        "美式英语",
+        "en",
+        "en-us",
+        "english"
+      ],
+      "script": "latin",
+      "chars_per_word": 5.1,
+      "detect_stopwords": [
+        "the",
+        "and",
+        "of",
+        "to",
+        "you",
+        "is",
+        "that",
+        "it",
+        "for",
+        "with"
+      ],
+      "speech_rate": {
+        "unit": "word",
+        "min": 2.4,
+        "target": [
+          2.8,
+          3.2
+        ],
+        "max": 3.8,
+        "unit_label": "词/秒"
+      },
+      "oral_rules": [
+        "用美式口语与拼写（color / realize / apartment / elevator），不用英式变体。",
+        "台词短、动词开头；避免书面连接词与被动语态。",
+        "称呼按关系：直呼名字或 mom/dad/boss；正式场合用 Mr./Ms. + 姓。"
+      ],
+      "forbidden_phrases": [
+        "I very like（中式语序；应为 I really like）",
+        "How to say（缺主语；应为 How do you say）",
+        "Welcome to sit（应为 Have a seat / Please sit down）",
+        "~ Please give me your advice（过度礼貌直译；口语用 What do you think?）",
+        "~ you are so cute 用错场合（中文「可爱」语义漂移）"
+      ],
+      "punctuation": {
+        "quotes": "\"\"",
+        "dash": "—",
+        "ellipsis": "…",
+        "note": "半角标点，句末标点后加一个空格"
+      },
+      "localization": [
+        "货币 USD",
+        "计量英制或公制按场景（短剧多用公制）",
+        "节日按美式（Thanksgiving / Christmas）"
+      ],
+      "name_policy": "统一人名表；中文名可用拼音或改为英文常用名，全剧统一。",
+      "script_markers": "[A-Za-z]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.02,
+        "min_marker_ratio": 0.7
+      }
+    },
+    "ja-JP": {
+      "label": "日语",
+      "native_name": "日本語",
+      "aliases": [
+        "日语",
+        "日文",
+        "ja",
+        "ja-jp",
+        "japanese"
+      ],
+      "script": "cjk",
+      "speech_rate": {
+        "unit": "char",
+        "min": 4.0,
+        "target": [
+          4.5,
+          5.5
+        ],
+        "max": 7.0,
+        "unit_label": "字/秒"
+      },
+      "oral_rules": [
+        "对白用角色关系决定的文体：家人/同辈用常体（だ・である），职场/生人用敬体（です・ます）。**同一角色文体不得任意漂移**。",
+        "第一人称按性别与角色设定固定（私 / 僕 / 俺），全剧一致。",
+        "第二人称避免直用「あなた」（生硬且常带责备感），用名字 + さん / ちゃん / 君，或省略主语。",
+        "短剧节奏：多用省略与倒装，避免长修饰从句。"
+      ],
+      "forbidden_phrases": [
+        "することができ（「〜することができます」滥用；直接用可能形）",
+        "~ あなたはどう思いますか 当寒暄用（日语寒暄不这么问）",
+        "~ 「〜ので、〜から」连续堆叠的中文语序直译",
+        "~ 「〜してあげる」在不对等关系里滥用（会失礼）"
+      ],
+      "punctuation": {
+        "quotes": "「」",
+        "period": "。",
+        "comma": "、",
+        "note": "全角标点；感叹/问号可全角可半角，同一稿统一"
+      },
+      "localization": [
+        "货币 JPY，金额读法按日语（万/億）",
+        "称谓体系：さん/様/ちゃん/君 + 職位（社長/部長）",
+        "节日按日式（お盆/年末年始）"
+      ],
+      "name_policy": "人名可保留中文音读或用日文名；若设定在日本则用日文名，全剧统一。",
+      "script_markers": "[぀-ヿ一-鿿]",
+      "foreign_script_pattern": "[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.05,
+        "min_marker_ratio": 0.6
+      }
+    },
+    "ko-KR": {
+      "label": "韩语",
+      "native_name": "한국어",
+      "aliases": [
+        "韩语",
+        "韩文",
+        "朝鲜语",
+        "ko",
+        "ko-kr",
+        "korean"
+      ],
+      "script": "hangul",
+      "speech_rate": {
+        "unit": "char",
+        "min": 3.5,
+        "target": [
+          4.0,
+          5.0
+        ],
+        "max": 6.5,
+        "unit_label": "音节/秒"
+      },
+      "oral_rules": [
+        "敬语阶必须成体系：晚辈/下属对上级用 -습니다체 或 -요체，同辈亲近用 반말。**同一关系不得随意换阶**。",
+        "称谓按关系固定（오빠/언니/형/누나/사장님/부장님）；姓名 + 씨/님 不可混用。",
+        "对白偏短句 + 语尾表达情绪（-잖아 / -거든 / -는데），少用书面连接词。"
+      ],
+      "forbidden_phrases": [
+        "~ 中文语序直译（主语-宾语-动词强行对齐中文语序）",
+        "~ 敬语阶与角色关系不符（同辈用 -습니다체 显得生分）",
+        "~ 「당신」当第二人称滥用（多用于争吵/夫妻）",
+        "~ 直译中式寒暄「你吃了吗」"
+      ],
+      "punctuation": {
+        "quotes": "“”或 「」",
+        "period": ".",
+        "note": "韩语混用半角句读，同一稿统一"
+      },
+      "localization": [
+        "货币 KRW，金额按韩语读法（만/억）",
+        "节日按韩式（설날/추석）",
+        "阶层与家族称呼按韩国体系"
+      ],
+      "name_policy": "若设定在韩国则用韩文名（성+이름），全剧统一。",
+      "script_markers": "[가-힯]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]",
+      "qc": {
+        "foreign_ratio_max": 0.05,
+        "min_marker_ratio": 0.5
+      }
+    },
+    "pt-BR": {
+      "label": "葡萄牙语（巴西）",
+      "native_name": "Português (Brasil)",
+      "aliases": [
+        "葡语",
+        "巴西葡语",
+        "pt",
+        "pt-br",
+        "portuguese"
+      ],
+      "script": "latin",
+      "chars_per_word": 5.1,
+      "detect_stopwords": [
+        "que",
+        "não",
+        "uma",
+        "para",
+        "com",
+        "você",
+        "está",
+        "muito",
+        "isso"
+      ],
+      "speech_rate": {
+        "unit": "word",
+        "min": 3.0,
+        "target": [
+          3.5,
+          4.0
+        ],
+        "max": 4.8,
+        "unit_label": "词/秒"
+      },
+      "oral_rules": [
+        "用巴西葡语（você 而非 tu 为主），避用葡葡词汇（celular 而非 telemóvel）",
+        "对白短促，口语缩略（tá / pra / né）"
+      ],
+      "forbidden_phrases": [
+        "faz|fez|fazer uma decisão（英语直译；应为 tomar uma decisão）",
+        "~ realizar 当 realize 用（realizar = 实现/执行；意识到 = perceber / dar-se conta）",
+        "~ atualmente 当 actually 用（atualmente = 目前；actually = na verdade）"
+      ],
+      "punctuation": {
+        "quotes": "“”",
+        "note": "疑问感叹不倒置"
+      },
+      "localization": [
+        "货币 BRL (R$)",
+        "节日按巴西（Carnaval）"
+      ],
+      "name_policy": "人名表统一。",
+      "script_markers": "[ãõçáéíóúâêôà]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.02,
+        "min_marker_ratio": 0.02
+      }
+    },
+    "th-TH": {
+      "label": "泰语",
+      "native_name": "ไทย",
+      "aliases": [
+        "泰语",
+        "th",
+        "th-th",
+        "thai"
+      ],
+      "script": "thai",
+      "speech_rate": {
+        "unit": "char",
+        "min": 4.0,
+        "target": [
+          5.0,
+          6.0
+        ],
+        "max": 7.5,
+        "unit_label": "字/秒"
+      },
+      "oral_rules": [
+        "人称与语气词（ครับ/ค่ะ/นะ/สิ）必须与角色性别、礼貌度一致",
+        "泰语书面无句读，字幕稿应**主动加空格断句**便于配音与字幕安全区"
+      ],
+      "forbidden_phrases": [
+        "~ 直译中文语序",
+        "~ 语气词性别用错（男性 ครับ / 女性 ค่ะ）"
+      ],
+      "punctuation": {
+        "quotes": "“”",
+        "note": "泰语不用句号，用空格断句"
+      },
+      "localization": [
+        "货币 THB",
+        "称谓 พี่/น้อง/คุณ"
+      ],
+      "name_policy": "人名表统一。",
+      "script_markers": "[฀-๿]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.05,
+        "min_marker_ratio": 0.6
+      }
+    },
+    "id-ID": {
+      "label": "印尼语",
+      "native_name": "Bahasa Indonesia",
+      "aliases": [
+        "印尼语",
+        "id",
+        "id-id",
+        "indonesian"
+      ],
+      "script": "latin",
+      "chars_per_word": 5.5,
+      "detect_stopwords": [
+        "yang",
+        "dan",
+        "tidak",
+        "ini",
+        "itu",
+        "saya",
+        "kamu",
+        "dengan",
+        "akan"
+      ],
+      "speech_rate": {
+        "unit": "word",
+        "min": 3.0,
+        "target": [
+          3.5,
+          4.0
+        ],
+        "max": 4.8,
+        "unit_label": "词/秒"
+      },
+      "oral_rules": [
+        "用口语印尼语（nggak / udah / gimana），非正式场合不用 baku 书面体",
+        "称谓按关系：aku/kamu（亲近）、saya/Anda（正式）"
+      ],
+      "forbidden_phrases": [
+        "~ 直译中文语序",
+        "~ 书面语（baku）与口语混用"
+      ],
+      "punctuation": {
+        "quotes": "“”",
+        "note": "半角句读"
+      },
+      "localization": [
+        "货币 IDR (Rp)",
+        "宗教与家庭称谓需可代入当地"
+      ],
+      "name_policy": "人名表统一。",
+      "script_markers": "[a-zA-Z]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.02,
+        "min_marker_ratio": 0.65
+      }
+    },
+    "vi-VN": {
+      "label": "越南语",
+      "native_name": "Tiếng Việt",
+      "aliases": [
+        "越南语",
+        "vi",
+        "vi-vn",
+        "vietnamese"
+      ],
+      "script": "latin",
+      "chars_per_word": 4.6,
+      "detect_stopwords": [
+        "không",
+        "của",
+        "và",
+        "là",
+        "tôi",
+        "em",
+        "anh",
+        "chị",
+        "này"
+      ],
+      "speech_rate": {
+        "unit": "word",
+        "min": 3.0,
+        "target": [
+          3.5,
+          4.2
+        ],
+        "max": 5.0,
+        "unit_label": "词/秒"
+      },
+      "oral_rules": [
+        "人称代词按年龄关系选择（anh/em/chị/tôi），**这是越南语最易出错处**",
+        "对白短，语气词（ạ/nhé/đấy）与关系匹配"
+      ],
+      "forbidden_phrases": [
+        "~ 人称代词与年龄/关系不符（anh/em/chị/tôi）",
+        "~ 直译中文语序"
+      ],
+      "punctuation": {
+        "quotes": "“”",
+        "note": "半角句读，重音符号不可省"
+      },
+      "localization": [
+        "货币 VND",
+        "家庭称谓按越南体系"
+      ],
+      "name_policy": "人名表统一。",
+      "script_markers": "[ăâđêôơưáàảãạếệỉịọỗộớờợứừửữựýỳỷỹỵ]",
+      "foreign_script_pattern": "[一-鿿]|[぀-ヿ]|[가-힯]",
+      "qc": {
+        "foreign_ratio_max": 0.02,
+        "min_marker_ratio": 0.02
+      }
+    }
+  },
+  "translation_steps": [
+    "1) 语种确认：`script_translate.py plan --to <lang>`（未给源语种则自动判定，不确定必须问用户）。",
+    "2) 术语表：先把人名/地名/专有名词/称谓固化成 glossary（同一角色全剧一种写法）。",
+    "3) 分段转译：按场/段切分转译，**保留原文结构与段落号**，便于对照与回退。",
+    "4) 本地化改写（不是直译）：俚语、笑话、文化梗替换为目标语观众可懂的等价表达。",
+    "5) 台词预算校验：按 `speech_rate_formula` 换算，超预算必须改写而非加速。",
+    "6) 质检：`script_translate.py check --to <lang>` —— 查残留源语言字符、翻译腔黑名单、术语一致性、语速预算。",
+    "7) 交付：`03-剧本/source-script.md`（原文）+ `03-剧本/source-script.<lang>.md`（转译稿）+ `glossary.json`。"
+  ],
+  "hard_redlines": [
+    "**不直译**：翻译腔（逐词对译、语序照搬）一律返工。",
+    "**不混语**：转译稿里不得残留源语言整句（专有名词音译除外）。",
+    "**不改剧情**：转译只换语言与本地化表达，**不得增删情节、改人设、改钩子**。",
+    "**术语一致**：同一人/物/机构全剧一种写法，出现第二种即失败。",
+    "**称谓成体系**：敬语/人称代词/亲属称谓必须与角色关系一致，不得漂移。",
+    "**不越合规**：本地化后仍须满足目标市场的合规红线（见 docs/compliance/发布前合规预检清单.md）。"
+  ]
+}

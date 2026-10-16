@@ -4,6 +4,10 @@
 > 交 `topic_analysis.py score`（③A）打分与萃取定位三要素，再由 `hit_selection.py select`（③B）敲定定位卡。
 >
 > 「思考」由 LLM 负责；「打分 / 交叉 / 去重 / 排期 / 定位卡」由脚本负责。
+>
+> ⚠️ **本环节可被「题材公式」跳过**（2026-10-16）：当用户输入命中已收录题材关键词（如「女主逆袭」）时，
+> 走 `genre_formula.py apply --genre <id>` → `script_rewrite.py plan --genre <id>`，
+> **S2a/S2b 不跑**。未命中时本环节照旧。见 `docs/creation/剧本强度工程.md` §六。
 
 ## 任务
 

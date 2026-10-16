@@ -12,7 +12,9 @@ script_rewrite / creation）都从这里取公共件，避免各写一份。
     二 爆款拆解         hit_breakdown.py   S1  题材类型/剧情套路/爆点元素/偏好/差异化趋势
     三 选题定位         topic_analysis.py  S2a 候选生成 + 七维评分 + 三维交叉
                         hit_selection.py   S2b 挑选 + 定位卡（受众画像/题材方向/差异化卖点）
-    四 剧本改写         script_rewrite.py  S3  源剧本 → N 集规划（默认 60）+ FFS 骨架 + 自检
+    〇 剧本转译         script_translate.py S0b 小说/剧本 → 目标语种（多语种）+ 语言质检
+    二·五 题材公式       genre_formula.py    S2.5 关键词→固定题材框架（可跳过选题）
+    四 剧本改写         script_rewrite.py  S3  源剧本 → N 集规划（默认 40）+ FFS 骨架 + 自检
 """
 from __future__ import annotations
 
@@ -52,6 +54,12 @@ REFERENCE_STRUCTURE = SCRIPT_DIR + "/reference-structure.json"
 SOURCE_SCRIPT = SCRIPT_DIR + "/source-script.md"
 BLUEPRINT = SCRIPT_DIR + "/blueprint.json"
 SCRIPT_BRIEF = SCRIPT_DIR + "/script-brief.json"
+# ★ 2026-10-16 新增：转译（S0b）与题材公式（S2.5）的产物
+SOURCE_SCRIPT_TRANSLATED = SCRIPT_DIR + "/source-script.%s.md"   # % 目标语短码（es/en/ja/…）
+TRANSLATE_PLAN = SCRIPT_DIR + "/translate-plan.json"
+TRANSLATION_BRIEF = SCRIPT_DIR + "/translation-brief.md"
+GLOSSARY = SCRIPT_DIR + "/glossary.json"
+GENRE_PLAN = SCRIPT_DIR + "/genre-plan.json"
 
 
 def harden_stdio() -> None:

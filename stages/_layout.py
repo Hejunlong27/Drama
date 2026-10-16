@@ -81,9 +81,11 @@ DEFAULT_LAYOUT: dict = {
     "layout_version": LAYOUT_VERSION,
     "engine_root": LEGACY_ENGINE_ROOT,
     "stages": dict(STAGE_DIRS),
-    # 引擎相对 engine_root 的覆盖值（写进 config.local.json 的 data_dir / out_dir）
-    "data_rel": "video-pipeline/data",
-    "out_rel": "video-pipeline/output",
+    # ⚠️ data_rel / out_rel 一律是**相对 engine_root** 的路径（与引擎 `_resolve_against` 同语义）。
+    #    旧布局下 engine_root 已经是 <ws>/video-pipeline，所以这里是 "data" / "output"，
+    #    **不是** "video-pipeline/data" —— 后者会拼成 video-pipeline/video-pipeline/data。
+    "data_rel": "data",
+    "out_rel": "output",
 }
 
 
@@ -204,8 +206,15 @@ def stage_rel(ws, rel: str) -> str:
         if rel == f:
             return f.split("/")[-1]
     for pre, key in LEGACY_STAGE_MAP.items():
-        if rel.startswith(pre):
-            return "%s/%s" % (lay["stages"][key], rel[len(pre):])
+        # ★ 2026-10-16 修正：前缀表里的键带尾斜杠，只匹配「文件级」路径，
+        #   导致「目录级」调用（如 `pdir(ws, "creation/01-breakdown")` 后 mkdir）
+        #   漏映射、在新布局里凭空建出空的 `creation/` 目录。
+        #   改为「边界感知」匹配：整体相等（目录级）或 `前缀 + /`（文件级）。
+        p = pre.rstrip("/")
+        if rel == p:
+            return lay["stages"][key]
+        if rel.startswith(p + "/"):
+            return "%s/%s" % (lay["stages"][key], rel[len(p) + 1:])
     return rel
 
 
@@ -260,18 +269,18 @@ def scaffold(ws, *, engine_root_name: str = LEGACY_ENGINE_ROOT) -> dict:
             created.append(str(p))
         p.mkdir(parents=True, exist_ok=True)
 
-    # 3) layout.json（引擎相对路径：data_dir / out_dir）
+    # 3) layout.json（data_rel / out_rel 一律**相对 engine_root**）
     er_name = er.name
-    data_rel = "%s/%s" % (er_name, STAGE_DIRS["prompts"])
-    out_rel = "%s/%s" % (er_name, STAGE_DIRS["film"])
+    data_rel = "../%s" % STAGE_DIRS["prompts"]
+    out_rel = "../%s" % STAGE_DIRS["film"]
     lay = {
         "layout_version": LAYOUT_VERSION,
         "engine_root": er_name,
         "stages": dict(STAGE_DIRS),
         "data_rel": data_rel,
         "out_rel": out_rel,
-        "_comment": ("阶段目录为各阶段唯一落点；data_rel / out_rel 是引擎相对 engine_root 的输入/输出目录，"
-                     "会被回填进 <engine_root>/config.local.json 的 data_dir / out_dir。"),
+        "_comment": ("阶段目录为各阶段唯一落点；data_rel / out_rel 是**相对 engine_root** 的"
+                     "输入/输出目录，会被回填进 <engine_root>/config.local.json 的 data_dir / out_dir。"),
     }
     lp = ws / LAYOUT_FILE
     lp.write_text(json.dumps(lay, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

@@ -4,14 +4,14 @@
 
 职责（**只搭规划骨架与红线，正文交 LLM 按 prompt 填**）
 -------------------------------------------------------
-对应交付的第四部分：**将一部「很颠」的西语短剧剧本改写为完整 N 集规划（默认 60 集），
+对应交付的第四部分：**将一部「很颠」的西语短剧剧本改写为完整 N 集规划（默认 40 集），
 每集须包含核心冲突、剧情反转与钩子设计；整体节奏紧凑、钩子密集、爽点高频。**
 
 本脚本做三件确定性的事：
 
 1. **集数蓝图 `plan`**：把定位卡（③）落到**逐集规划**——每集给出
    `核心冲突 / 剧情反转 / 钩子 / 钩子类型 / 情绪走向 / 节拍说明`，
-   并植入**爆点节拍**（中型爆点每 6 集、大型爆点每 15 集、集尾钩子短收）。
+   并植入**爆点节拍**（中型爆点每 4 集、大型爆点每 10 集、集尾钩子短收）。
    源剧本（`source-script.md`，"很颠"的原稿）会先被登记与体检。
 2. **FFS 骨架 `build`**：按 `docs/creation/ffs-spec.md` 生成某集的文件头 + N 个空镜头块，
    字段与顺序合规，LLM 只需替换占位符。
@@ -40,6 +40,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import _common as C  # noqa: E402
+import genre_formula as G  # noqa: E402  ★ 题材公式（S2.5）：跳过选题、给每集公式化要求
 
 # ---- STYLE LOCK 预设（与 docs/creation/stylelock-presets.md 一致） ----------
 BASE_LOCK = "no watermark, no subtitle, no text overlay, no logo"
@@ -64,11 +65,12 @@ STYLE_LOCKS = {
                 "detailed character design, 2.39:1 widescreen, " + BASE_LOCK,
 }
 
-DEFAULT_EPISODES = 30        # ★ 2026-10-16 用户拍板：由 60 降为 30（前 3 集留存攻坚 + 投入产出比）
+DEFAULT_EPISODES = 40        # ★ 2026-10-16 用户拍板：默认 40 集（由 30 上调）
+DEFAULT_EP_SECONDS = 70      # ★ 2026-10-16 用户拍板：单集 70 秒（由 90 下调）
 ACT_SPLIT = [("起", 0.15), ("承", 0.45), ("转", 0.75), ("合", 1.0)]
 HOOK_TYPES = ["身份悬念", "危机逼近", "关系反转", "秘密揭露", "选择困境", "意外登场", "代价预告"]
-MID_BOOM_EVERY = 3           # 中型爆点（30 集口径；60 集口径为 6，**密度保持一致**）
-BIG_BOOM_EVERY = 8           # 大型爆点（30 集口径；60 集口径为 15，**密度保持一致**）
+MID_BOOM_EVERY = 4           # 中型爆点（40 集口径；60 集口径为 6，**密度保持一致**）
+BIG_BOOM_EVERY = 10          # 大型爆点（40 集口径；60 集口径为 15，**密度保持一致**）
 
 # ===========================================================================
 # ★ 留存率导向的剧本结构（2026-10-16 新增）
@@ -157,9 +159,9 @@ REDLINE_HARD = [
 FFS_HEADER_ORDER = ["TITLE", "EP", "PLATFORM", "STYLE LOCK", "CHAR", "SCENE"]
 FFS_SHOT_FIELDS = ["SHOT", "LOCATION", "TIME", "CHAR", "ACTION", "DIALOG", "VO", "SFX"]
 FFS_FORBIDDEN = ["MOOD", "CAMERA", "EMOTION", "MUSIC", "LIGHT"]
-SHOT_MIN, SHOT_MAX = 6, 15
+SHOT_MIN, SHOT_MAX = 5, 12    # 每集镜头数（70 秒口径；90 秒口径为 6-15）
 DUR_MIN, DUR_MAX = 4, 15
-TOTAL_MIN, TOTAL_MAX = 90, 120
+TOTAL_MIN, TOTAL_MAX = 70, 95   # 单集正片总时长（70 秒口径；90 秒口径为 90-120）
 
 
 # ---------------------------------------------------------------------------
@@ -195,15 +197,41 @@ def _pick(bank: list, i: int) -> str:
     return bank[(i - 1) % len(bank)]
 
 
-def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool = False) -> int:
-    pos_obj = C.read_json(C.pdir(ws, C.POSITIONING))
-    if not isinstance(pos_obj, dict) or not pos_obj.get("selected"):
-        print("[FAIL] 找不到③定位卡：%s（先跑 hit_selection.py select）" % C.pdir(ws, C.POSITIONING))
-        return 2
-    card = next((x for x in pos_obj["selected"] if x.get("rank") == rank), None)
-    if not card:
-        print("[FAIL] 定位卡里没有 rank=%d" % rank)
-        return 2
+def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool = False,
+         genre: str | None = None) -> int:
+    """集数规划。两种入口：
+
+    * **常规**：读 ③选题定位卡（`positioning.json`；
+    * **题材公式**：`--genre female-comeback`，或工作区已有 `genre-plan.json`（套用过的公式）
+      → **跳过选题**，直接用公式的 topic_card + 逐集公式化要求（打脸/阶梯/见证者/压放/里程碑/金句）。
+    """
+    gf = None
+    if genre:
+        try:
+            gf = G.load(genre)
+        except KeyError as e:
+            print("[FAIL] %s" % e)
+            return 2
+    else:
+        gp = G.load_plan(ws)
+        if gp and gp.get("_formula"):
+            gf, genre = gp["_formula"], gp["genre"]
+
+    if gf:
+        card = G.build_topic_card(gf)
+        pos_obj = {"selected": [card], "_from_genre": gf["id"]}
+        print("[i] 题材公式模式：%s —— **跳过选题环节**（S2a/S2b 不跑）" % gf.get("label"))
+    else:
+        pos_obj = C.read_json(C.pdir(ws, C.POSITIONING))
+        if not isinstance(pos_obj, dict) or not pos_obj.get("selected"):
+            print("[FAIL] 找不到③定位卡：%s（先跑 hit_selection.py select）" % C.pdir(ws, C.POSITIONING))
+            print("       或者套用题材公式跳过选题：genre_formula.py apply --genre <id> → "
+                  "script_rewrite.py plan --genre <id>")
+            return 2
+        card = next((x for x in pos_obj["selected"] if x.get("rank") == rank), None)
+        if not card:
+            print("[FAIL] 定位卡里没有 rank=%d" % rank)
+            return 2
     brief = C.read_json(C.pdir(ws, C.BRIEF)) or {}
     bd = C.read_json(C.pdir(ws, C.BREAKDOWN)) or {}
     src = inspect_source(ws)
@@ -215,6 +243,10 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
     style = _pick_style_lock(str(card.get("genre_direction")))
     platform = (card.get("audience_profile") or {}).get("platform") or brief.get("platform") or "TikTok"
 
+    hf = (gf or {}).get("hook_formula") or {}
+    # 前 3 集爆款钩子公式（题材公式自带；EP1 黄金 3 秒 → EP3 首个小打脸）
+    hf_map = {1: ("ep1_golden_3s", "ep1_tail"), 2: ("ep2_mid", "ep2_tail"), 3: ("ep3_mid", "ep3_tail")}
+
     episodes_list = []
     for i in range(1, n + 1):
         act = _act_of(i, n)
@@ -222,9 +254,7 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
         boom = ("big" if i % BIG_BOOM_EVERY == 0 else ("mid" if i % MID_BOOM_EVERY == 0 else "none"))
         r_name, r_note = _retention_role(i)
         cold = COLD_OPEN_BANK[r_name][(i - 1) % len(COLD_OPEN_BANK[r_name])]
-        if i == 1:
-            cold = "★黄金 3 秒：把全剧最高冲突前置到开场（禁止背景铺垫、禁止慢热）"
-        episodes_list.append({
+        item = {
             "ep": i, "act": act,
             "retention_role": r_name,
             "cold_open": cold,
@@ -235,7 +265,19 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
             "emotion": EMOTION_CYCLE[(i - 1) % len(EMOTION_CYCLE)],
             "beat_note": ("★大型爆点集" if boom == "big" else ("中型爆点集" if boom == "mid" else "常规推进")),
             "boom": boom,
-        })
+        }
+        if gf:
+            # ★ 题材公式模式：每集附公式化要求（打脸/等级/见证者/压放/里程碑/金句）
+            item.update(G.episode_overlay(gf, i, n))
+            if i in hf_map:
+                k1, k2 = hf_map[i]
+                item["cold_open"] = "【前3集钩子公式】%s" % (hf.get(k1) or cold)
+                item["hook"] = "【集尾钩子公式】%s" % (hf.get(k2) or item["hook"])
+            if i == 1:
+                item["cold_open"] = "★黄金 3 秒（公式）：%s" % (hf.get("ep1_golden_3s") or "")
+        elif i == 1:
+            item["cold_open"] = "★黄金 3 秒：把全剧最高冲突前置到开场（禁止背景铺垫、禁止慢热）"
+        episodes_list.append(item)
 
     hook_chain = [{"ep": e["ep"], "type": e["hook_type"], "hook": e["hook"]}
                   for e in episodes_list[:3]]
@@ -248,7 +290,7 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
         "title": card.get("title"), "title_es": card.get("title_es"),
         "market": (card.get("audience_profile") or {}).get("market") or brief.get("market"),
         "platform": platform, "form": brief.get("form") or "AI漫剧",
-        "total_ep": n, "ep_seconds": brief.get("ep_seconds") or 90,
+        "total_ep": n, "ep_seconds": brief.get("ep_seconds") or DEFAULT_EP_SECONDS,
         "style_lock": style, "rank": rank,
         "source_script": src,
         "positioning_digest": {
@@ -275,31 +317,63 @@ def plan(ws: pathlib.Path, rank: int = 1, episodes: int | None = None, dry: bool
         "episodes": episodes_list,
         "hot_tropes": [t["name"] for t in (bd.get("tropes") or []) if t.get("count", 0) >= 2][:6],
         "differentiation_redlines": REDLINE_HARD + list(card.get("differentiation_redlines") or []),
+        # ★ 题材公式（S2.5）：套用时把公式与 QC 口径一并落盘，供 genre_formula.py check 复核
+        "topic_source": "genre-formula" if gf else "positioning",
+        "genre": ({
+            "id": genre, "label": gf.get("label"),
+            "engine": (gf.get("engine") or {}).get("formula"),
+            "phase_ids": [p.get("id") for p in (gf.get("phases") or [])],
+            "punch_ladder": gf.get("punch_ladder"),
+            "punch_five_beats": gf.get("punch_five_beats"),
+            "hook_formula": gf.get("hook_formula"),
+            "quote_rules": (gf.get("dialogue_policy") or {}).get("quote_rules"),
+            "qc": gf.get("qc"),
+            "skipped_topic": True,
+            "note": "命中关键词即跳过选题；每集 punch/punch_level/witness/stake/milestone/quote 由公式生成。",
+        } if gf else None),
         "note": "本文件是④改写的**结构规划**；每集正文由 LLM 按 prompts/s3-script-rewrite.md 填。",
     }
 
     print(C.hr())
     print("④ 剧本改写 · 集数规划（源剧本改写为 %d 集）" % n)
     print(C.hr())
-    print("  选题      : #%d %s（%s）" % (rank, card.get("title"), card.get("genre_direction")))
+    print("  选题      : %s" % ("**跳过选题**（题材公式 %s）" % gf.get("label") if gf
+                                else "#%d %s（%s）" % (rank, card.get("title"), card.get("genre_direction"))))
     print("  平台/形态 : %s / %s" % (platform, obj["form"]))
     print("  源剧本    : %s" % ("已登记（%d 字 / 场景 %d）" % (src.get("chars", 0), src.get("scenes_detected", 0))
                               if src.get("present") else "未提供（按定位卡原创结构）"))
     print("  幕结构    : %s" % "；".join("%s EP%s" % (a["act"], a["ep_range"]) for a in act_structure))
     print("  钩子链    : %s" % " → ".join("%s(%s)" % (h["type"], h["ep"]) for h in hook_chain))
     print("  留存结构  : 每集四件套（开场钩子 + 核心冲突 + 一次反转 + 集尾钩子）")
-    print("              三段：%s" % "；".join(
-        "EP1-%s %s" % (r["ep_upto"], r["role"]) for r in obj["retention_plan"]["roles"][:2])
-        + "；EP11+ %s" % obj["retention_plan"]["roles"][-1]["role"])
+    _roles = obj["retention_plan"]["roles"]
+    _seg, _lo = [], 1
+    for r in _roles[:-1]:
+        _seg.append("EP%d-%s %s" % (_lo, r["ep_upto"], r["role"]))
+        _lo = (r["ep_upto"] or 0) + 1
+    _seg.append("EP%d+ %s" % (_lo, _roles[-1]["role"]))
+    print("              三段：%s" % "；".join(_seg))
     print("              EP1 = %s" % obj["retention_plan"]["ep1_golden_3s"])
     print("  爆点节拍  : 中型 %d 次（每 %d 集）/ 大型 %d 次（每 %d 集）"
           % (obj["boom_cadence"]["mid_count"], MID_BOOM_EVERY,
              obj["boom_cadence"]["big_count"], BIG_BOOM_EVERY))
+    if gf:
+        ladder = " → ".join("L%d %s" % (l.get("level"), l.get("name")) for l in gf.get("punch_ladder") or [])
+        step = "；".join("%s %s" % (p.get("id"), p.get("name")) for p in gf.get("phases") or [])
+        print("  题材公式  : %s" % gf.get("label"))
+        print("  公式引擎  : %s" % ((gf.get("engine") or {}).get("formula") or ""))
+        print("  阶段      : %s" % step)
+        print("  打脸阶梯  : %s" % ladder)
+        print("  压放呼吸  : 每 3 集至少 1 压 1 放（本规划已按 %s 循环标注）" % "→".join(G.STAKE_CYCLE))
     print("  前 8 集预览：")
     for e in episodes_list[:8]:
-        print("    EP%02d [%s] %s｜反转：%s｜钩子(%s)：%s"
+        extra = ""
+        if gf:
+            extra = "｜%s%s｜打脸 L%d%s" % (e.get("stake") or "", "★里程碑" if e.get("milestone") else "",
+                                            e.get("punch_level") or 0,
+                                            "（有见证者）" if e.get("witness") else "")
+        print("    EP%02d [%s] %s｜反转：%s｜钩子(%s)：%s%s"
               % (e["ep"], e["act"], e["core_conflict"][:22], e["reversal"][:16],
-                 e["hook_type"], e["hook"][:24]))
+                 e["hook_type"], e["hook"][:24], extra))
     print("    … 共 %d 集，逐集见 blueprint.json / blueprint.md" % n)
 
     if dry:
@@ -561,11 +635,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="④ 剧本改写：集数规划 + FFS 骨架 + 结构自检")
     ap.add_argument("--workspace", default=None)
     sub = ap.add_subparsers(dest="cmd")
-    p = sub.add_parser("plan", help="把定位卡落成 N 集规划（默认 60）")
+    p = sub.add_parser("plan", help="把定位卡落成 N 集规划（默认 %d）" % DEFAULT_EPISODES)
     p.add_argument("--rank", type=int, default=1)
     p.add_argument("--episodes", type=int, default=None)
+    p.add_argument("--genre", default=None,
+                   help="套用题材公式并**跳过选题**（如 female-comeback）；工作区已有 genre-plan.json 时自动套用")
     p.add_argument("--dry", action="store_true")
-    p.set_defaults(fn=lambda a: plan(C.resolve_ws(a.workspace), a.rank, a.episodes, a.dry))
+    p.set_defaults(fn=lambda a: plan(C.resolve_ws(a.workspace), a.rank, a.episodes, a.dry, a.genre))
     p = sub.add_parser("build", help="生成某集 FFS 骨架")
     p.add_argument("--ep", type=int, required=True)
     p.add_argument("--shots", type=int, default=8)

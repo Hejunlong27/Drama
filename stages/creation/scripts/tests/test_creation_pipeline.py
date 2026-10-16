@@ -117,7 +117,7 @@ def main() -> int:
 
         C.write_json(ws / C.BRIEF, {"slug": "t", "title": "测试剧", "platform": "ReelShort",
                                     "market": "es-LATAM", "audience": "拉美女性 18-40",
-                                    "ep_total": 30, "ep_seconds": 90, "form": "AI漫剧"})   # ★ 2026-10-16 默认口径 60→30
+                                    "ep_total": 40, "ep_seconds": 70, "form": "AI漫剧"})   # ★ 2026-10-16 默认口径：40 集 × 70 秒
 
         # ================= ① 榜单调研与对比 =================
         C.write_json(ws / C.MARKET_FILE, _mk_market(today))
@@ -207,8 +207,8 @@ def main() -> int:
         rc, out = _quiet(SR.plan, ws, 1, None, False)
         bp = C.read_json(ws / C.BLUEPRINT) or {}
         check("④ 落盘集数规划", bool(bp))
-        # ★ 2026-10-16：默认集数 60 → 30；节拍 中型每 3 / 大型每 8（与 60 集口径密度一致）
-        check("④ 规划 30 集（默认口径）", bp.get("total_ep") == 30 and len(bp.get("episodes", [])) == 30,
+        # ★ 2026-10-16：默认集数 40（30→40）；节拍 中型每 4 / 大型每 10（与 60 集口径密度一致）
+        check("④ 规划 40 集（默认口径）", bp.get("total_ep") == 40 and len(bp.get("episodes", [])) == 40,
               "n=%s" % bp.get("total_ep"))
         ep1 = (bp.get("episodes") or [{}])[0]
         check("④ 每集含 冲突/反转/钩子/钩子类型",
@@ -232,9 +232,9 @@ def main() -> int:
               and bp["retention_plan"].get("ep1_golden_3s"))
         check("④ 源剧本已登记", (bp.get("source_script") or {}).get("present") is True)
         _bc = bp["boom_cadence"]
-        _mid = 30 // 3 - len([i for i in range(1, 31) if i % 3 == 0 and i % 8 == 0])
-        check("④ 爆点节拍（30 集：中型 %d / 大型 %d）" % (_mid, 30 // 8),
-              _bc["mid_count"] == _mid and _bc["big_count"] == 30 // 8,
+        _mid = 40 // 4 - len([i for i in range(1, 41) if i % 4 == 0 and i % 10 == 0])
+        check("④ 爆点节拍（40 集：中型 %d / 大型 %d）" % (_mid, 40 // 10),
+              _bc["mid_count"] == _mid and _bc["big_count"] == 40 // 10,
               json.dumps(_bc, ensure_ascii=False))
         check("④ 钩子链前 3 集", [h["type"] for h in bp["hook_chain"]] == ["身份悬念", "危机逼近", "秘密揭露"])
         check("④ 幕结构 4 幕", len(bp.get("act_structure", [])) == 4)
@@ -251,7 +251,7 @@ def main() -> int:
 
         # lint：好 / 坏剧本
         def _ffs(blocks: int, drop_field: str | None = None) -> str:
-            head = ("# TITLE: 测试剧\n# EP: 01/60\n# PLATFORM: ReelShort\n"
+            head = ("# TITLE: 测试剧\n# EP: 01/40\n# PLATFORM: ReelShort\n"
                     "# STYLE LOCK: %s\n# CHAR: AYLA: x\n# SCENE: CLIFF: y\n" % SR.STYLE_LOCKS["狼人"])
             out = [head]
             for i in range(1, blocks + 1):

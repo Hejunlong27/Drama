@@ -492,6 +492,39 @@ def cmd_models(args) -> int:
     return run_cmd(cmd, 'models', quiet_ok=False)[0]
 
 
+def cmd_style(args) -> int:
+    """转发给 style_gate.py（画风三轨门禁：status / list / set / reset / ask / require）。"""
+    STYLE_GATE_PY = SCRIPTS / 'style_gate.py'
+    cmd = [sys.executable, STYLE_GATE_PY, '--workspace', str(WS)]
+    c = getattr(args, 'style_cmd', None)
+    if c == 'list':
+        cmd.append('list')
+    elif c == 'set':
+        cmd += ['set', args.choice]
+        if getattr(args, 'sub_mode', None):
+            cmd += ['--sub-mode', args.sub_mode]
+    elif c == 'reset':
+        cmd.append('reset')
+    elif c == 'ask':
+        cmd.append('ask')
+    elif c == 'require':
+        cmd.append('require')
+    else:                                    # 默认 status
+        cmd.append('status')
+        if getattr(args, 'json', False):
+            cmd.append('--json')
+    return run_cmd(cmd, 'style', quiet_ok=False)[0]
+
+
+def cmd_halfcheck(args) -> int:
+    """转发给 half_narrated_check.py（半解说结构三类硬校验）。"""
+    HC_PY = SCRIPTS / 'half_narrated_check.py'
+    cmd = [sys.executable, HC_PY, '--workspace', str(WS)]
+    if getattr(args, 'which', None):
+        cmd.append(args.which)
+    return run_cmd(cmd, 'halfcheck', quiet_ok=False)[0]
+
+
 # ---------------------------------------------------------------------------
 # assets：缺失资产出图（默认本地 ComfyUI ￥0；可选 RunningHub 云端计费）
 # ---------------------------------------------------------------------------
@@ -839,6 +872,31 @@ def main() -> int:
     q.add_argument('kind', nargs='?', default='image', choices=('image', 'video'))
     q.set_defaults(fn=cmd_models)
     p.set_defaults(fn=cmd_models, models_cmd=None)
+
+    # ★ 画风三轨门禁（前置条件）：任务开始前必须先确认画风（3D 漫剧 / 2D 动画 / 真人）
+    p = sub.add_parser('style', help='画风三轨确认：3d_manhua / 2d_animation / live_action')
+    ss = p.add_subparsers(dest='style_cmd')
+    q = ss.add_parser('list', help='打印可选画风清单（含各自规格）')
+    q.set_defaults(fn=cmd_style)
+    q = ss.add_parser('status', help='查看当前画风确认状态（只读）')
+    q.add_argument('--json', action='store_true')
+    q.set_defaults(fn=cmd_style)
+    q = ss.add_parser('set', help='记录确认：set 3d_manhua|2d_animation|live_action [--sub-mode ...]')
+    q.add_argument('choice', choices=('3d_manhua', '2d_animation', 'live_action'))
+    q.add_argument('--sub-mode', dest='sub_mode', default=None)
+    q.set_defaults(fn=cmd_style)
+    q = ss.add_parser('reset', help='清除画风确认（换画风前用；已产出素材会作废）')
+    q.set_defaults(fn=cmd_style)
+    q = ss.add_parser('ask', help='交互式引导确认（需 TTY）')
+    q.set_defaults(fn=cmd_style)
+    q = ss.add_parser('require', help='门禁查询（未过则退出码 4；供上游脚本调用）')
+    q.set_defaults(fn=cmd_style)
+    p.set_defaults(fn=cmd_style, style_cmd=None)
+
+    # ★ 半解说结构校验（旁白时间窗 / 资产规格 / 首帧锚点）
+    p = sub.add_parser('halfcheck', help='半解说结构三类硬校验（读 05-分镜/storyboard.json）')
+    p.add_argument('which', nargs='?', default='all', choices=('all', 'windows', 'assets', 'anchors'))
+    p.set_defaults(fn=cmd_halfcheck)
 
     pv = sub.add_parser('video', help='出片')
     vs = pv.add_subparsers(dest='vcmd')

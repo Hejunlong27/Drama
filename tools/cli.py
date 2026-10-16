@@ -336,7 +336,7 @@ def main() -> None:
     p.add_argument("--title", required=True)
     p.add_argument("--platform", default="TikTok")
     p.add_argument("--ep", type=int, default=20)
-    p.add_argument("--sec", type=int, default=110)
+    p.add_argument("--sec", type=int, default=70)  # ★ 2026-10-16：单集 70 秒口径
     p.add_argument("--style-lock", default=DEFAULT_STYLE_LOCK)
     p.set_defaults(func=cmd_init)
 

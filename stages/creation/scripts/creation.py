@@ -8,7 +8,7 @@
     ② 爆款拆解        hit_breakdown.py  题材类型/剧情套路/爆点元素/内容偏好/差异化趋势
     ③ 选题定位        topic_analysis.py 候选 + 七维评分 + 三维交叉（A）
                       hit_selection.py  多样性排期 + 对标匹配 → 定位卡（B）
-    ④ 剧本改写        script_rewrite.py 源剧本 → N 集规划（默认 60）+ FFS 骨架 + 自检
+    ④ 剧本改写        script_rewrite.py 源剧本 → N 集规划（默认 40）+ FFS 骨架 + 自检
     ── 交付 ──        tools/cli.py      init / import-bible / check / convert
     ── 执行 ──        stages/production/drama.py  模型门禁 → 资产 → 出片 → 字幕
 
@@ -21,13 +21,13 @@
 命令
 ----
     python creation.py scaffold --workspace "D:/剧/新剧" --slug mi-venganza --title "我的复仇有爪牙" \
-        --platform ReelShort --ep 60 --sec 90
+        --platform ReelShort --ep 40 --sec 70
     python creation.py status
     python creation.py market queries | market check | market compare | market template --write
     python creation.py breakdown analyze
     python creation.py topic scaffold | topic score
     python creation.py hit select --top 3
-    python creation.py script plan --episodes 60 | script build --ep 1 --emit | script lint --ep 1
+    python creation.py script plan --episodes 40 | script build --ep 1 --emit | script lint --ep 1
 """
 from __future__ import annotations
 
@@ -49,7 +49,8 @@ except Exception:                             # noqa: BLE001
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]   # .../SoloDrama
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 
-DEFAULT_EPISODES = 30      # ★ 2026-10-16 用户拍板：默认集数由 60 降为 30（提升单集留存率与投入产出比）
+DEFAULT_EPISODES = 40      # ★ 2026-10-16 用户拍板：默认集数 40（由 30 上调）
+DEFAULT_EP_SECONDS = 70    # ★ 2026-10-16 用户拍板：默认单集 70 秒（由 90 下调）
 
 BRIEF_TEMPLATE = {
     "slug": "<英文短名>", "title": "<中文剧名>",
@@ -58,7 +59,7 @@ BRIEF_TEMPLATE = {
     "audience": "<拉美女性 18-40>",
     "genre_directions": ["<女频逆袭>", "<狼人奇幻>"],
     "budget_tier": "<低|中|高>",
-    "ep_total": DEFAULT_EPISODES, "ep_seconds": 90,
+    "ep_total": DEFAULT_EPISODES, "ep_seconds": DEFAULT_EP_SECONDS,
     "style_hint": "<可选：色卡/基调偏好>",
     "notes": "<其他约束，如：源剧本很颠，保留其核心爽点>",
 }
@@ -241,8 +242,9 @@ def main() -> int:
     p.add_argument("--title", required=True)
     p.add_argument("--platform", default="ReelShort")
     p.add_argument("--ep", type=int, default=DEFAULT_EPISODES,
-                   help="总集数（④剧本改写规划用，默认 %d —— 2026-10-16 由 60 下调）" % DEFAULT_EPISODES)
-    p.add_argument("--sec", type=int, default=90)
+                   help="总集数（④剧本改写规划用，默认 %d）" % DEFAULT_EPISODES)
+    p.add_argument("--sec", type=int, default=DEFAULT_EP_SECONDS,
+                   help="单集秒数（默认 %d）" % DEFAULT_EP_SECONDS)
     p.add_argument("--style-lock", default=None)
     p.set_defaults(fn=cmd_scaffold)
 

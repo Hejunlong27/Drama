@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS projects(
   title TEXT NOT NULL,
   platform TEXT,
   total_ep INTEGER,
-  ep_seconds INTEGER DEFAULT 110,
+  ep_seconds INTEGER DEFAULT 70,
   style_lock TEXT NOT NULL,
   style_lock_hash TEXT NOT NULL,
   created_at TEXT

@@ -180,7 +180,7 @@ WorkBuddy 创作会话
 | **② 爆款拆解** | `hit_breakdown.py` | 题材分布 / 剧情套路库 / 爆点元素频次 / 榜单洞察 / 内容偏好（西语置顶）/ 差异化趋势（长尾·未饱和·窗口期） | `creation/01-breakdown/breakdown.json/.md` |
 | **③ 选题定位·A** | `topic_analysis.py` | 七维加权评分（权重合计 1.0）；`score_basis` 逐维必填；合规 ≤3 一票否决；三维交叉；赛道占比 >40% 降级；萃取**定位三要素** | `creation/02-positioning/candidates.json/.md` |
 | **③ 选题定位·B** | `hit_selection.py` | 否决/不合格隔离；同赛道 Top-N 最多 1 个；对标匹配 + ②拆解校准 → **定位卡** | `creation/02-positioning/positioning.json/.md` |
-| **④ 剧本改写** | `script_rewrite.py` | 源剧本登记；**N 集规划（默认 60）**，每集**核心冲突 + 反转 + 钩子**；爆点节拍（中型每 6 集 / 大型每 15 集）；FFS 骨架（8 字段 / 90–120 秒 / 6–15 镜）+ 结构自检 | `creation/03-script/blueprint.json/.md` + `script-brief.md` + `skeleton_ep_XX.md` |
+| **④ 剧本改写** | `script_rewrite.py` | 源剧本登记；**N 集规划（默认 40）**，每集**开场钩子 + 核心冲突 + 反转 + 集尾钩子**；爆点节拍（中型每 4 集 / 大型每 10 集）；FFS 骨架（8 字段 / 70–95 秒 / 5–12 镜）+ 结构自检 | `creation/03-script/blueprint.json/.md` + `script-brief.md` + `skeleton_ep_XX.md` |
 
 **数据契约**：①→② 用 `markets/rankings/hits/trends`（记录 id 回指）；②→③ 用 `tropes/boom_elements/content_preferences`；
 ③A→③B 用 `status ∈ kept|demoted|vetoed|error`；③B→④ 用 `selected[].rank` 与定位卡；
