@@ -90,14 +90,17 @@ def read_json(p, default=None):
 def write_json(p, obj) -> pathlib.Path:
     p = pathlib.Path(p)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # ★ newline=""：**强制 LF**。Windows 上 write_text 默认会把 \n 转成 \r\n，
+    #   而仓库纪律是 LF（.gitattributes `* text=auto eol=lf`）—— 生成物（如 blueprint、
+    #   由 JSON 生成的 md）若写成 CRLF，会把工作树弄脏、并与 manifest 口径不一致。
+    p.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="")
     return p
 
 
 def write_text(p, text: str) -> pathlib.Path:
     p = pathlib.Path(p)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+    p.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8", newline="")
     return p
 
 
